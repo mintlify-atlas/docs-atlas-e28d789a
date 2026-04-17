@@ -1,0 +1,275 @@
+---
+title: "Plugin settings for eslint-plugin-import"
+description: "Reference for all import/* ESLint settings that control how eslint-plugin-import resolves modules, caches results, and identifies internal vs external packages."
+---
+
+`eslint-plugin-import` reads a set of shared settings from your ESLint config to control how it resolves modules, which file extensions it considers, how long it caches results, and how it classifies packages as internal or external. These settings live under the `settings` key in `.eslintrc` (or the `settings` property of a flat config object) and apply to every rule in the plugin. None of them are required—each has a sensible default—but getting them right is the difference between rules that reflect your actual module graph and rules that produce false positives.
+
+---
+
+## `import/extensions`
+
+<ParamField path="settings.import/extensions" type="string[]" default='[".js"]'>
+  A list of file extensions that the plugin parses as ES modules and inspects for `export` statements. Any extension not in this list will not be followed when checking named exports, namespaces, or defaults.
+</ParamField>
+
+The default is `['.js']`. The `react` shared config extends it to `['.js', '.jsx']`; the `typescript` shared config extends it further to `['.ts', '.cts', '.mts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']`.
+
+```js .eslintrc.js
+module.exports = {
+  settings: {
+    'import/extensions': ['.js', '.jsx'],
+  },
+};
+```
+
+For more granular control you can set extensions per resolver instead:
+
+```js .eslintrc.js
+module.exports = {
+  settings: {
+    'import/resolver': {
+      node: {
+        extensions: ['.js', '.jsx'],
+      },
+    },
+  },
+};
+```
+
+<Note>
+`import/extensions` (the setting) controls which files the plugin parses for exports. `import/resolver` extensions control which files the resolver attempts to find on disk. The two lists overlap but serve different purposes—a `.json` file may be resolvable but not worth inspecting for exports.
+</Note>
+
+---
+
+## `import/ignore`
+
+<ParamField path="settings.import/ignore" type="string[]" default="[]">
+  A list of regex strings. If a resolved module's absolute filesystem path matches any pattern, the plugin skips export inspection for that file. Rules other than `no-unresolved` will not report issues for matching imports.
+</ParamField>
+
+`no-unresolved` has its own separate `ignore` rule option and is not affected by this setting.
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/ignore": [
+      "\\.coffee$",
+      "\\.(scss|less|css)$"
+    ]
+  }
+}
+```
+
+Useful for file types that cannot be parsed as JavaScript modules—preprocessed CSS, CoffeeScript, binary assets, and so on.
+
+---
+
+## `import/core-modules`
+
+<ParamField path="settings.import/core-modules" type="string[]" default="[]">
+  Additional module names to treat as "core" modules—always resolvable, with no path on the filesystem. The Node resolver already knows about `fs`, `path`, `crypto`, and other Node built-ins; list here any runtime-provided modules that your resolver does not know about.
+</ParamField>
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/core-modules": ["electron"]
+  }
+}
+```
+
+Without this, `import 'electron'` would be flagged as unresolved because `electron` is not a package in `node_modules`—it is injected at runtime by the Electron host. The `electron` shared config sets this for you automatically.
+
+---
+
+## `import/external-module-folders`
+
+<ParamField path="settings.import/external-module-folders" type="string[]" default='["node_modules"]'>
+  Folders whose resolved modules are classified as "external" rather than "internal". Accepts folder names, subpaths, or absolute path prefixes.
+</ParamField>
+
+Each item in the array can be:
+
+- A folder name — matches any folder with that name at any depth (`jspm_modules`)
+- A subpath — matches any path containing those two segments (`packages/core`)
+- An absolute prefix — matches only paths under that directory (`/home/me/project/packages`)
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/external-module-folders": ["node_modules", "jspm_modules"]
+  }
+}
+```
+
+For Yarn PnP:
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/external-module-folders": ["node_modules", ".yarn"]
+  }
+}
+```
+
+For a monorepo where packages live in `packages/`:
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/external-module-folders": ["node_modules", "packages"]
+  }
+}
+```
+
+<Tip>
+In a monorepo, listing your packages directory here treats sibling packages as external. If you want to keep them classified as internal instead, use `import/internal-regex` rather than adding them here.
+</Tip>
+
+---
+
+## `import/parsers`
+
+<ParamField path="settings.import/parsers" type="object" default="{}">
+  A map from parser package names to arrays of file extensions. When the plugin processes a file whose extension is in the list, it uses the specified parser instead of ESLint's configured parser. This allows the plugin to inspect TypeScript source files for exports without requiring TypeScript as the global ESLint parser.
+</ParamField>
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/parsers": {
+      "@typescript-eslint/parser": [".ts", ".cts", ".mts", ".tsx"]
+    }
+  }
+}
+```
+
+The parser package must be installed as a peer of ESLint and loadable via `require`. This setting is most commonly used with `@typescript-eslint/parser`, but is theoretically compatible with any ESTree-compliant parser.
+
+---
+
+## `import/resolver`
+
+<ParamField path="settings.import/resolver" type="string | object">
+  The resolver (or ordered list of resolvers) the plugin uses to find modules on the filesystem. Accepts a resolver name string, or an object mapping resolver names to their configuration.
+</ParamField>
+
+Resolvers can be referenced by short name (the `eslint-import-resolver-*` suffix is added automatically), full npm package name, or filesystem path.
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/resolver": {
+      "typescript": true,
+      "node": true
+    }
+  }
+}
+```
+
+```js .eslintrc.js
+const path = require('path');
+
+module.exports = {
+  settings: {
+    'import/resolver': {
+      webpack: { config: 'webpack.config.js' },
+      [path.resolve('../../../my-resolver')]: { someConfig: 'value' },
+    },
+  },
+};
+```
+
+See the [resolvers guide](/guides/resolvers) for full documentation including how to write a custom resolver.
+
+---
+
+## `import/cache`
+
+<ParamField path="settings.import/cache" type="object">
+  Controls how long the plugin's in-memory cache of resolved modules and parsed exports is kept alive.
+</ParamField>
+
+<ParamField path="settings.import/cache.lifetime" type="number | string" default="30">
+  Cache lifetime in seconds. Set to `Infinity` (JS config) or `"∞"` (JSON config) to never evict. Set to a small integer when running under a long-lived linting process.
+</ParamField>
+
+For standard `eslint` CLI invocations the cache lifetime is irrelevant—the process ends after each run and the cache is discarded. For long-lived processes like [`eslint_d`](https://www.npmjs.com/package/eslint_d) or [`eslint-loader`](https://www.npmjs.com/package/eslint-loader), stale cache entries will prevent the plugin from seeing changes to dependency files.
+
+<CodeGroup>
+
+```jsonc .eslintrc — infinite cache
+{
+  "settings": {
+    "import/cache": {
+      "lifetime": "∞"
+    }
+  }
+}
+```
+
+```js .eslintrc.js — infinite cache
+module.exports = {
+  settings: {
+    'import/cache': {
+      lifetime: Infinity,
+    },
+  },
+};
+```
+
+```jsonc .eslintrc — 5-second lifetime
+{
+  "settings": {
+    "import/cache": {
+      "lifetime": 5
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+The default lifetime is `30` seconds, which is a reasonable value for `eslint_d` and similar tools that keep the process alive between file saves.
+
+---
+
+## `import/internal-regex`
+
+<ParamField path="settings.import/internal-regex" type="string">
+  A regex pattern. Any import whose specifier matches this pattern is classified as "internal", regardless of what folder it resolves to. Takes precedence over `import/external-module-folders`.
+</ParamField>
+
+Useful in a monorepo where scoped packages (e.g. `@myorg/*`) live inside a directory that would otherwise be treated as external.
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/internal-regex": "^@scope/"
+  }
+}
+```
+
+With this setting, `import '@scope/utils'` is treated as an internal import even if `@scope/utils` resolves to a path inside `node_modules` or another folder listed in `import/external-module-folders`.
+
+---
+
+## `import/node-version`
+
+<ParamField path="settings.import/node-version" type="string">
+  The Node.js version string the plugin should assume when evaluating Node-specific rules (such as `import/no-nodejs-modules`). Defaults to the version of Node.js currently running ESLint.
+</ParamField>
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/node-version": "22.3.4"
+  }
+}
+```
+
+Set this explicitly when your lint environment runs a different Node version than your production or target environment—for example, when running ESLint under Node 20 but targeting Node 18 APIs.
+
+A falsy or absent value uses the version of Node.js executing ESLint.

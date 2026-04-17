@@ -1,0 +1,231 @@
+---
+title: "Use eslint-plugin-import with TypeScript"
+description: "Configure eslint-plugin-import to correctly resolve TypeScript files, understand .ts/.tsx extensions, and work with @typescript-eslint/parser."
+---
+
+By default, `eslint-plugin-import` is configured for plain JavaScript. Without additional setup, it will not understand TypeScript's `paths` aliases, `baseUrl`, or `.ts`/`.tsx` extensions—and rules like `import/no-unresolved` and `import/named` will produce false positives on every TypeScript file. This guide walks through the minimum configuration required, and shows both the legacy `.eslintrc` and modern flat config approaches.
+
+## Prerequisites
+
+Install the two packages that make TypeScript support work:
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install --save-dev @typescript-eslint/parser eslint-import-resolver-typescript
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add --dev @typescript-eslint/parser eslint-import-resolver-typescript
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add --save-dev @typescript-eslint/parser eslint-import-resolver-typescript
+    ```
+  </Tab>
+</Tabs>
+
+| Package | Purpose |
+|---|---|
+| `@typescript-eslint/parser` | Parses `.ts`/`.tsx` files into an AST that ESLint rules can inspect |
+| `eslint-import-resolver-typescript` | Resolves imports following `tsconfig.json` `paths`, `baseUrl`, and `exports` maps |
+
+## The `plugin:import/typescript` shared config
+
+`eslint-plugin-import` ships a `typescript` shared config that applies three settings automatically—you do not need to repeat them manually:
+
+```js config/typescript.js
+const typeScriptExtensions = ['.ts', '.cts', '.mts', '.tsx'];
+const allExtensions = [...typeScriptExtensions, '.js', '.jsx', '.mjs', '.cjs'];
+
+module.exports = {
+  settings: {
+    'import/extensions': allExtensions,
+    'import/external-module-folders': ['node_modules', 'node_modules/@types'],
+    'import/parsers': {
+      '@typescript-eslint/parser': typeScriptExtensions,
+    },
+    'import/resolver': {
+      node: {
+        extensions: allExtensions,
+      },
+    },
+  },
+  rules: {
+    // TypeScript compilation already ensures named imports exist in the
+    // referenced module, so this rule is redundant and noisy for .ts files.
+    'import/named': 'off',
+  },
+};
+```
+
+<Note>
+The `plugin:import/typescript` config disables `import/named` for TypeScript files because TypeScript's own compiler already validates named exports. Keeping the rule enabled produces false positives on type-only imports and re-exported types.
+</Note>
+
+The config sets `import/external-module-folders` to include `node_modules/@types` so that `@types/*` declaration packages are treated as external, not internal modules.
+
+## Full configuration examples
+
+<Tabs>
+  <Tab title="Legacy (.eslintrc)">
+    The quickest setup extends three configs and adds the TypeScript resolver:
+
+    ```jsonc .eslintrc
+    {
+      "extends": [
+        "eslint:recommended",
+        "plugin:import/recommended",
+        "plugin:import/typescript"
+      ],
+      "settings": {
+        "import/resolver": {
+          "typescript": true,
+          "node": true
+        }
+      }
+    }
+    ```
+
+    <Tip>
+      Setting both `"typescript": true` and `"node": true` ensures that Node built-ins (`fs`, `path`, etc.) are resolved alongside TypeScript path aliases.
+    </Tip>
+
+    For a project that needs granular control over every setting, you can expand the configuration manually:
+
+    ```jsonc .eslintrc
+    {
+      "parser": "@typescript-eslint/parser",
+      "plugins": ["import"],
+      "settings": {
+        "import/parsers": {
+          "@typescript-eslint/parser": [".ts", ".cts", ".mts", ".tsx"]
+        },
+        "import/resolver": {
+          "typescript": true,
+          "node": true
+        },
+        "import/extensions": [
+          ".ts", ".cts", ".mts", ".tsx",
+          ".js", ".jsx", ".mjs", ".cjs"
+        ],
+        "import/external-module-folders": [
+          "node_modules",
+          "node_modules/@types"
+        ]
+      },
+      "rules": {
+        "import/no-unresolved": "error",
+        "import/named": "off",
+        "import/namespace": "error",
+        "import/default": "error",
+        "import/export": "error"
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Flat config (eslint.config.js)">
+    With flat config, spread `importPlugin.flatConfigs.typescript` into the config array for TypeScript files:
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+    import js from '@eslint/js';
+
+    export default [
+      js.configs.recommended,
+      importPlugin.flatConfigs.recommended,
+      {
+        files: ['**/*.{ts,tsx,cts,mts}'],
+        ...importPlugin.flatConfigs.typescript,
+        settings: {
+          'import/resolver': {
+            typescript: true,
+            node: true,
+          },
+        },
+      },
+    ];
+    ```
+  </Tab>
+
+  <Tab title="Flat config with typescript-eslint">
+    If you are already using the `config()` helper from `typescript-eslint`, place the import plugin configs inside the `extends` array of the relevant config object:
+
+    ```js eslint.config.js
+    import tseslint from 'typescript-eslint';
+    import importPlugin from 'eslint-plugin-import';
+    import js from '@eslint/js';
+
+    export default tseslint.config(
+      js.configs.recommended,
+      {
+        files: ['**/*.{ts,tsx}'],
+        extends: [
+          importPlugin.flatConfigs.recommended,
+          importPlugin.flatConfigs.typescript,
+        ],
+        settings: {
+          'import/resolver': {
+            typescript: true,
+            node: true,
+          },
+        },
+      }
+    );
+    ```
+
+    <Info>
+      The `tseslint.config()` helper merges configs differently from the plain array approach. Placing `flatConfigs.typescript` inside `extends` ensures it is scoped to the `files` glob and does not affect JavaScript files.
+    </Info>
+  </Tab>
+</Tabs>
+
+## What each setting does
+
+<AccordionGroup>
+  <Accordion title="import/parsers">
+    Maps parsers to the file extensions they should handle. When the plugin processes a `.ts` or `.tsx` file, it uses `@typescript-eslint/parser` instead of ESLint's default parser. This is required for rules that inspect the contents of imported files (such as `import/named`).
+
+    ```jsonc
+    {
+      "settings": {
+        "import/parsers": {
+          "@typescript-eslint/parser": [".ts", ".cts", ".mts", ".tsx"]
+        }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="import/extensions">
+    The list of file extensions the plugin considers when resolving bare specifiers and validating exports. The TypeScript config extends the default `['.js']` to include all TypeScript and modern JavaScript variants:
+
+    ```js
+    ['.ts', '.cts', '.mts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']
+    ```
+
+    Without this, `import './utils'` would not resolve to `utils.ts`.
+  </Accordion>
+
+  <Accordion title="import/resolver with typescript">
+    The `eslint-import-resolver-typescript` package reads your `tsconfig.json` and applies its `paths`, `baseUrl`, and `moduleResolution` settings during lint. Passing `true` uses default options; you can also pass an object for advanced configuration per the [resolver's own docs](https://github.com/import-js/eslint-import-resolver-typescript#configuration).
+
+    ```jsonc
+    {
+      "settings": {
+        "import/resolver": {
+          "typescript": true,
+          "node": true
+        }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="import/named disabled for TypeScript">
+    TypeScript's compiler validates that every named import matches an export in the target module. Running `import/named` on top of that produces duplicate (and sometimes incorrect) errors for type imports, declaration merging, and ambient modules. The TypeScript config sets this rule to `"off"` for `.ts`/`.tsx` files.
+  </Accordion>
+</AccordionGroup>

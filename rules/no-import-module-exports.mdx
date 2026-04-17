@@ -1,0 +1,107 @@
+---
+title: "import/no-import-module-exports — flag mixed import/exports"
+description: "Reports files that mix ES import declarations with CommonJS module.exports or exports assignments, flagging a pattern that confuses bundlers and runtimes."
+---
+
+The `import/no-import-module-exports` rule reports any file that uses ES `import` declarations alongside CommonJS `module.exports` or `exports.*` assignments. Mixing the two systems in the same file is invalid in native ESM and causes subtle bugs in some bundlers — the CommonJS export silently wins or the bundler emits a warning. The rule is auto-fixable: ESLint's `--fix` flag rewrites the offending `import` statements to `require()` calls, making the file consistently CommonJS.
+
+The rule is aware of your package's entry point (resolved from `package.json#main`). Files that match the main entry point are excluded automatically because some patterns intentionally re-export from a CJS entry. Additional files can be excluded via the `exceptions` option.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-import-module-exports": "error"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config (`recommended`, `errors`, etc.) despite its `recommended: true` metadata. Add it explicitly to your config.
+</Warning>
+
+## Options
+
+<ParamField body="exceptions" type="string[]" default="[]">
+  An array of glob patterns. Any file whose path matches a glob in this list is excluded from the rule. Use this for secondary entry points, files using `js:next`, or other deliberate mixed-module files that are not the package's `main` entry point.
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+
+```js ✅ Valid — ES import with ES export
+import thing from 'other-thing'
+export default thing
+```
+
+```js ❌ Invalid — ES import mixed with CommonJS export
+import { stuff } from 'starwars'
+module.exports = thing
+
+import * as allThings from 'starwars'
+exports.bar = thing
+
+import thing from 'other-thing'
+exports.foo = bar
+
+import thing from 'starwars'
+const baz = module.exports = thing
+console.log(baz)
+```
+
+</CodeGroup>
+
+### Files that are purely CommonJS are valid
+
+```js ✅ Valid — no import declarations, only require
+const thing = require('thing')
+module.exports = thing
+
+const thing = require('thing')
+exports.foo = bar
+```
+
+### The package entry point is always excluded
+
+Given the following `package.json`:
+
+```json package.json
+{
+  "main": "lib/index.js"
+}
+```
+
+```js ✅ Valid — lib/index.js is the package entry point
+// lib/index.js
+import foo from 'path'
+module.exports = foo
+```
+
+### Excluding additional files with `exceptions`
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-import-module-exports": ["error", {
+      "exceptions": ["**/*/some-file.js"]
+    }]
+  }
+}
+```
+
+```js ✅ Valid — some-file.js matches the exception glob
+// some-file.js
+import foo from 'path'
+module.exports = foo
+```
+
+## When to use / when to disable
+
+Enable this rule whenever your project uses ES modules and you want to prevent accidental CommonJS/ESM mixing. It is particularly valuable in repos that have partially migrated from CommonJS and where a developer may mistakenly add an `import` to a file that still uses `module.exports`.
+
+Disable this rule if:
+
+- Your build tool (e.g. Webpack, Rollup, esbuild) explicitly supports and correctly handles mixed `import` / `module.exports` syntax in your configuration.
+- You have a large number of dual-mode files and the `exceptions` list would become unwieldy — in that case, consider restructuring the files rather than suppressing the rule.

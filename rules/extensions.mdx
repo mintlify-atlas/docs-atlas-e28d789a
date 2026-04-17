@@ -1,0 +1,213 @@
+---
+title: "import/extensions — enforce file extension in imports"
+description: "Enforce or forbid file extensions in imports with per-extension overrides, ignorePackages, checkTypeImports, and pathGroupOverrides for alias-heavy setups."
+---
+
+The `import/extensions` rule enforces a consistent policy on whether file extensions must be included or omitted in import specifiers. Some module resolvers (such as the CommonJS `node` resolver) automatically append `.js`, so extensions are optional. Others (native ESM, some bundlers) require them. This rule lets you mandate one convention across the codebase. Configuration accepts a global string shorthand, a per-extension object, or a combination of both, along with an `ignorePackages` flag to exempt bare package specifiers.
+
+```jsonc
+// .eslintrc — require extensions for local files, ignore packages
+{
+  "rules": {
+    "import/extensions": ["error", "always", { "ignorePackages": true }]
+  }
+}
+```
+
+<Note>
+  `import/extensions` is **not** included in any shared config (`recommended`,
+  `warnings`, etc.). Configure it explicitly based on the resolver and runtime
+  your project targets.
+</Note>
+
+---
+
+## Options
+
+The rule accepts up to three positional arguments after the severity level.
+
+### Global mode string
+
+<ParamField body="[0]" type={"\"always\" | \"never\" | \"ignorePackages\""} default={"\"never\""}>
+  Sets the default extension policy for all imports.
+
+  | Value | Behavior |
+  |-------|----------|
+  | `"never"` | Extensions must be omitted (e.g. `import foo from './foo'`) |
+  | `"always"` | Extensions must be present (e.g. `import foo from './foo.js'`) |
+  | `"ignorePackages"` | Extensions required for relative/aliased imports; bare package specifiers are ignored |
+</ParamField>
+
+---
+
+### Per-extension configuration object
+
+<ParamField body="[1] (object form)" type="object">
+  Provide an object where each key is a file extension (without the leading dot)
+  and the value is one of the three mode strings. This form sets per-extension
+  rules when no global mode string is provided.
+
+  ```jsonc
+  "import/extensions": ["error", { "js": "always", "json": "never" }]
+  ```
+</ParamField>
+
+---
+
+### Combined global + per-extension
+
+<ParamField body="[1] (string) + [2] (object)" type="combined">
+  Supply both a global mode string and a per-extension override object. The
+  string sets the default; the object provides granular overrides.
+
+  ```jsonc
+  // Omit all extensions except .svg
+  "import/extensions": ["error", "never", { "svg": "always" }]
+  ```
+</ParamField>
+
+---
+
+### `ignorePackages` (option object)
+
+<ParamField body="ignorePackages" type="boolean" default="false">
+  When set inside the options object (rather than as the global mode string),
+  exempts bare package imports from the extension rule while still applying the
+  configured policy to relative and aliased imports.
+
+  ```jsonc
+  "import/extensions": [
+    "error",
+    "always",
+    {
+      "ignorePackages": true,
+      "pattern": { "ts": "never" }
+    }
+  ]
+  ```
+</ParamField>
+
+---
+
+### `pattern`
+
+<ParamField body="pattern" type="object">
+  When using the object form that also contains `ignorePackages`, place
+  per-extension overrides here instead of at the top level.
+</ParamField>
+
+---
+
+### `checkTypeImports`
+
+<ParamField body="checkTypeImports" type="boolean" default="false">
+  By default, `import type` and `export type` declarations are exempt from this
+  rule. Set to `true` to apply the configured extension policy to type-only
+  imports and exports as well.
+</ParamField>
+
+---
+
+### `pathGroupOverrides`
+
+<ParamField body="pathGroupOverrides" type="PathGroupOverride[]">
+  An array of override objects that force the rule to always **enforce** or
+  always **ignore** specific import patterns, regardless of the global
+  `ignorePackages` setting. This is especially useful when custom specifier
+  aliases look like external or builtin imports to the resolver.
+
+  Each `PathGroupOverride` object:
+
+  | Property | Required | Type | Description |
+  |----------|----------|------|-------------|
+  | `pattern` | ✓ | `string` | Minimatch glob matched against the import specifier |
+  | `patternOptions` | | `object` | Minimatch options; default `{ nocomment: true }` |
+  | `action` | ✓ | `"enforce" \| "ignore"` | Whether to enforce or ignore the extension rule for matching imports |
+
+  ```jsonc
+  "import/extensions": [
+    "error",
+    "never",
+    {
+      "pathGroupOverrides": [
+        { "pattern": "some-package", "action": "ignore" },
+        { "pattern": "local-alias:{*,*/**}", "action": "enforce" }
+      ]
+    }
+  ]
+  ```
+</ParamField>
+
+---
+
+## Examples
+
+<CodeGroup>
+
+```js Valid ("never")
+import foo from './foo'
+import bar from './bar'
+import Component from './Component'
+import express from 'express/index'
+import * as path from 'path'
+```
+
+```js Invalid ("never")
+import foo from './foo.js'
+import bar from './bar.json'
+import Component from './Component.jsx'
+import express from 'express/index.js'
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```js Valid ("always")
+import foo from './foo.js'
+import bar from './bar.json'
+import Component from './Component.jsx'
+import * as path from 'path'
+import foo from '@/foo.js'
+```
+
+```js Invalid ("always")
+import foo from './foo'
+import bar from './bar'
+import Component from './Component'
+import foo from '@/foo'
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```js Valid ("ignorePackages")
+import foo from './foo.js'
+import bar from './bar.json'
+import Component from './Component.jsx'
+import express from 'express'      // package — ignored
+import foo from '@/foo'            // scoped — ignored
+```
+
+```js Invalid ("ignorePackages")
+import foo from './foo'            // local — extension required
+import bar from './bar'
+import Component from './Component'
+```
+
+</CodeGroup>
+
+---
+
+## Exception: ambiguous extensions
+
+When omitting an extension would make the import unresolvable (e.g. both `./foo/bar.js` and `./foo/bar.json` exist), the rule allows the extension even under `"never"` mode, because removing it would change which file is actually imported.
+
+---
+
+## When to use / when to disable
+
+**Use this rule** when your runtime or bundler requires explicit extensions (native ESM in Node.js 12+, Deno, certain bundler configurations) or when you want to prevent developers from relying on resolver magic that may differ between environments.
+
+**Disable this rule** if your toolchain consistently resolves extensions automatically and you prefer the brevity of extension-free imports throughout the codebase.

@@ -1,0 +1,130 @@
+---
+title: "import/no-unused-modules — detect unused exports"
+description: "Reports exports that no other module in the project statically imports, and can also flag files with no exports at all, helping you prune dead code."
+---
+
+The `import/no-unused-modules` rule performs project-wide analysis to find exports that nothing imports and, optionally, files that export nothing at all. Unlike most ESLint rules that are file-local, this one builds a cross-file import and export map at lint time and compares the two. Dynamic `import()` calls with a literal string argument are treated as static imports for this purpose.
+
+At least one of `unusedExports` or `missingExports` must be set to `true` — with both `false` (the defaults) the rule does nothing. Exports from files listed in `package.json`'s `main`, `browser`, or `bin` fields are automatically ignored when the package is public (i.e. `private` is not `true`).
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-unused-modules": ["warn", { "unusedExports": true }]
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config. You must enable it explicitly and provide at least one of `unusedExports: true` or `missingExports: true`.
+</Warning>
+
+## Options
+
+<ParamField body="unusedExports" type="boolean" default="false">
+  When `true`, any export that is not statically imported by at least one other module in the project is reported. This is the primary mode for dead-code detection. Requires at least one file to be in scope via `src`.
+</ParamField>
+
+<ParamField body="missingExports" type="boolean" default="false">
+  When `true`, files that contain no exports at all are reported. Useful for enforcing that every module has a public surface, preventing accidental "script" files in an ES module project.
+</ParamField>
+
+<ParamField body="ignoreExports" type="string[]" default="[]">
+  Array of file paths or glob patterns for which unused exports are not reported. Use this for entry points (e.g. `["src/index.js"]`) that are consumed by external tooling rather than imported within the project.
+</ParamField>
+
+<ParamField body="src" type="string[]" default="[process.cwd()]">
+  Paths or glob patterns that define which files are analysed for import usage. Only applies when `unusedExports` is `true`. Defaults to the current working directory.
+</ParamField>
+
+<ParamField body="ignoreUnusedTypeExports" type="boolean" default="false">
+  When `true`, TypeScript type exports (`export type`, `export interface`, `export enum`) that have no static usage are not reported. Has no effect unless `unusedExports` is also `true`.
+</ParamField>
+
+## Examples
+
+### Unused exports
+
+<CodeGroup>
+
+```js ✅ Valid — every export is imported somewhere
+// math.js
+export const add = (a, b) => a + b   // imported by main.js ✓
+export default function noop() {}     // imported by main.js ✓
+
+// main.js
+import noop, { add } from './math'
+```
+
+```js ❌ Invalid — export with no consumers
+// math.js
+export const add = (a, b) => a + b   // imported ✓
+export const subtract = (a, b) => a - b  // exported declaration 'subtract' not used within other modules
+
+// main.js
+import { add } from './math'
+```
+
+</CodeGroup>
+
+### Missing exports
+
+<CodeGroup>
+
+```js ✅ Valid — file has at least one export
+export const config = { debug: false }
+```
+
+```js ❌ Invalid — module-level file with no exports
+const config = { debug: false }  // No exports found
+
+function helper() { return 42 }
+```
+
+</CodeGroup>
+
+### Ignoring entry points
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-unused-modules": [
+      "warn",
+      {
+        "unusedExports": true,
+        "ignoreExports": ["src/index.js", "src/cli.js"]
+      }
+    ]
+  }
+}
+```
+
+### TypeScript — ignoring unused type exports
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-unused-modules": [
+      "warn",
+      { "unusedExports": true, "ignoreUnusedTypeExports": true }
+    ]
+  }
+}
+```
+
+```ts
+// These will NOT be reported when ignoreUnusedTypeExports is true
+export type ApiResponse = { status: number }
+export interface UserRecord { id: string }
+export enum Direction { Up, Down }
+```
+
+## When to use / when to disable
+
+Enable `unusedExports` to eliminate dead code in application codebases where every export should have an internal consumer. Pair `ignoreExports` with your public entry points to avoid false positives on the package boundary.
+
+Enable `missingExports` in strict ES module projects to ensure every file participates in the module graph rather than running as a side-effect-only script.
+
+Disable this rule (or rely on `ignoreExports`) for published library packages, since consumers live outside the analysed file set and all public exports will otherwise be reported as unused. Be aware that this rule is computationally heavier than most — on very large codebases you may want to run it only in CI rather than on every keystroke.

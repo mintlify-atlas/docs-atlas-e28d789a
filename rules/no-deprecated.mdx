@@ -1,0 +1,90 @@
+---
+title: "import/no-deprecated — warn on @deprecated imports"
+description: "Reads JSDoc @deprecated tags from imported modules and flags each marked name at the import specifier and at every subsequent reference within the file."
+---
+
+The `import/no-deprecated` rule inspects the export map of every imported module and checks whether the exported binding carries a `@deprecated` JSDoc tag. When it does, the rule reports at two points: the import specifier itself, and every subsequent identifier reference within the file. This gives you deprecation warnings inline in your editor without having to run the project or read the source of a dependency.
+
+Namespace imports (`import * as ns`) are also supported — accessing a deprecated member through `ns.deprecatedMember` is reported at the property dereference. Only JSDoc is enabled by default; TomDoc-style `Deprecated:` block comments can be enabled via the `import/docstyle` shared setting.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-deprecated": "warn"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config (`recommended`, `errors`, or `warnings`). Add it explicitly if you want deprecation reporting.
+</Warning>
+
+### Enabling TomDoc support
+
+```yaml .eslintrc.yml
+settings:
+  import/docstyle: ['jsdoc', 'tomdoc']
+```
+
+## Options
+
+This rule takes no options. Deprecation detection is driven by the `import/docstyle` shared setting rather than rule-level configuration.
+
+## Examples
+
+Given a module that marks an export deprecated:
+
+```js answer.js
+/**
+ * This is what you get when you trust a mouse talk show.
+ * @deprecated need to restart the experiment
+ * @returns {number} nonsense
+ */
+export function multiply(six, nine) {
+  return 42
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid — importing a non-deprecated export
+import { divide } from './answer' // no @deprecated tag on divide
+
+function compute(a, b) {
+  return divide(a, b)
+}
+```
+
+```js ❌ Invalid — importing and using a @deprecated export
+import { multiply } from './answer' // Deprecated: need to restart the experiment
+
+function whatever(y, z) {
+  return multiply(y, z) // Deprecated: need to restart the experiment
+}
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```js ✅ Valid — namespace import where the accessed member is not deprecated
+import * as math from './answer'
+
+math.divide(4, 2)
+```
+
+```js ❌ Invalid — deprecated member accessed through namespace
+import * as math from './answer'
+
+math.multiply(6, 9) // Deprecated: need to restart the experiment
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+Enable this rule when your codebase or its dependencies use JSDoc `@deprecated` tags as a signal that an API should be replaced. It is especially useful during migrations — mark the old API deprecated, enable this rule, and every call site surfaces as a warning without breaking the build.
+
+Set the severity to `"warn"` rather than `"error"` in most cases; deprecations are a soft signal that an API has a replacement, not a correctness bug. Disable it if your team does not maintain JSDoc deprecation tags consistently, since stale tags will produce false positives.

@@ -1,0 +1,88 @@
+---
+title: "import/named — validate named import specifiers"
+description: "Reports named imports and re-exports that do not match any named export in the target module, catching typos and stale references early."
+---
+
+The `import/named` rule verifies that every name listed inside `{ }` braces actually exists in the module being imported from. It checks both `import { foo } from './module'` declarations and ES2017-style `export { foo } from './module'` re-exports. When a package's `package.json` includes a `module` field, the rule reads that entry point to discover exported names — making popular packages like Redux lintable without any extra configuration.
+
+A module path that is ignored via the [`import/ignore`](https://github.com/import-js/eslint-plugin-import#importignore) setting, or that is not unambiguously an ES module, is silently skipped rather than reported as an error.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/named": "error"
+  }
+}
+```
+
+<Note>
+  This rule is included in the `errors` and `recommended` shared configs.
+</Note>
+
+<Warning>
+  This rule is **disabled** in the `typescript` shared config. TypeScript's own compiler already performs named-export checking, and enabling this rule on `.ts` files can produce false positives when types are involved.
+</Warning>
+
+## Options
+
+<ParamField body="commonjs" type="boolean" default="false">
+  When `true`, destructured `require()` calls are also checked:
+  `const { foo } = require('./module')` will be validated against the module's named exports.
+</ParamField>
+
+## Examples
+
+Given the following module:
+
+```js math.js
+export const add = (a, b) => a + b
+export const subtract = (a, b) => a - b
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+import { add, subtract } from './math'
+
+// Re-export
+export { add as plus } from './math'
+
+// Packages without jsnext:main are not analysed (ignored by default)
+import { SomeNonsenseThatDoesntExist } from 'react'
+```
+
+```js ❌ Invalid
+import { multiply } from './math'      // 'multiply' not found in './math'
+
+export { divide as quotient } from './math'  // 'divide' not found in './math'
+```
+
+</CodeGroup>
+
+### CommonJS destructuring
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/named": ["error", { "commonjs": true }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+const { add } = require('./math')
+```
+
+```js ❌ Invalid
+const { multiply } = require('./math')  // 'multiply' not found
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+Enable this rule in JavaScript projects to catch import typos and mismatches before runtime. Disable it or use the `typescript` config if you are working in TypeScript, where the compiler already provides this guarantee. Also consider disabling it if you heavily modify module exports at runtime (e.g., via `Object.assign(module.exports, …)`), as those patterns will generate false positives.

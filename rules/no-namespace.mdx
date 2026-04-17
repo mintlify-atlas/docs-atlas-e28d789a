@@ -1,0 +1,83 @@
+---
+title: "import/no-namespace — disallow wildcard namespace imports"
+description: "Forbid import * as foo style namespace imports, encouraging named imports instead, with an optional glob-based ignore list for specific modules."
+---
+
+The `import/no-namespace` rule forbids the `import * as foo` (namespace import) syntax. Namespace imports pull every export of a module into a single object, which can obscure exactly which exports are actually used, prevents tree-shaking, and makes it harder for editors and type-checkers to provide precise completions. The rule is **auto-fixable** when the namespace object is accessed only via direct property reads (`foo.bar`): `eslint --fix` will replace the namespace specifier with individual named imports and update every reference site.
+
+```jsonc
+// .eslintrc
+{
+  "rules": {
+    "import/no-namespace": "error"
+  }
+}
+```
+
+<Note>
+  `import/no-namespace` is **not** included in the `recommended` or `warnings`
+  shared configs. Enable it explicitly when your project wants to enforce named
+  imports over namespace imports.
+</Note>
+
+---
+
+## Options
+
+### `ignore`
+
+<ParamField body="ignore" type="string[]" default="[]">
+  An array of glob patterns (matched with [minimatch](https://github.com/isaacs/minimatch)
+  using `matchBase: true`). Namespace imports whose module specifier matches any
+  of these patterns are silently ignored.
+
+  ```jsonc
+  "import/no-namespace": ["error", { "ignore": ["*.ext", "some-package"] }]
+  ```
+</ParamField>
+
+---
+
+## Examples
+
+<CodeGroup>
+
+```js Valid
+import defaultExport from './foo'
+import { a, b } from './bar'
+import defaultExport, { a, b } from './foobar'
+```
+
+```js Valid (ignore glob)
+/* eslint import/no-namespace: ["error", { "ignore": ["*.ext"] }] */
+import * as bar from './ignored-module.ext'
+```
+
+```js Invalid
+import * as foo from 'foo'
+```
+
+```js Invalid
+import defaultExport, * as foo from 'foo'
+```
+
+</CodeGroup>
+
+---
+
+## Auto-fix behavior
+
+The fixer operates only when the namespace object is used exclusively for simple property access (`namespace.member` or `namespace['member']`). In that case it:
+
+1. Replaces `* as foo` in the import statement with the list of individual named imports that are actually referenced.
+2. Replaces every `foo.member` access in the file with the corresponding named identifier.
+
+When the namespace is used in any other way (passed as an argument, spread, used as a dynamic key, etc.) the rule reports the error but does not attempt a fix, since it cannot safely determine which names to extract.
+
+---
+
+## When to use / when to disable
+
+**Use this rule** when you want to keep import lists explicit and make it clear which exports each file depends on. Named imports are easier to tree-shake, easier to search for in a codebase, and surface dead-code faster.
+
+**Disable this rule** if you intentionally use namespace imports — for example, to re-export a module's entire public API, to work with libraries that lack complete TypeScript types, or to write adapter modules that forward all exports from a dependency.

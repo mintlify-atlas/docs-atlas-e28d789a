@@ -1,0 +1,73 @@
+---
+title: "import/export — forbid invalid and duplicate exports"
+description: "Catches modules that export the same name or default more than once and reports every conflicting declaration, surfacing copy-paste and duplication errors."
+---
+
+The `import/export` rule reports any module that exports the same name more than once — including multiple `export default` declarations in a single file. When a name or default is re-exported `n` times, all `n` occurrences are reported because at least `n-1` are unintentional; the rule cannot determine which one was meant to survive.
+
+This frequently surfaces copy-paste mistakes, incomplete refactors, or accidental barrel-file collisions where `export * from` pulls in a name that's already exported directly. The rule is TypeScript-aware: function overloads and namespace-merging patterns that are valid TypeScript are not flagged.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/export": "error"
+  }
+}
+```
+
+<Note>
+  This rule is included in both the `errors` and `recommended` shared configs. If you extend either config you do not need to add it manually.
+</Note>
+
+## Options
+
+This rule takes no options. The `schema` is empty — all export-conflict detection is automatic.
+
+## Examples
+
+<CodeGroup>
+
+```js ✅ Valid — unique export names
+export const foo = function () { /* ... */ }
+
+function bar() { /* ... */ }
+export { bar }
+
+export default class MyClass { /* ... */ }
+```
+
+```js ❌ Invalid — duplicate default export
+export default class MyClass { /* ... */ } // Multiple default exports.
+
+function makeClass() { return new MyClass(...arguments) }
+
+export default makeClass // Multiple default exports.
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```js ✅ Valid — aliased re-export avoids collision
+export const foo = function () { /* ... */ }
+
+function bar() { /* ... */ }
+export { bar as baz } // different name — no conflict
+```
+
+```js ❌ Invalid — same named export twice
+export const foo = function () { /* ... */ } // Multiple exports of name 'foo'.
+
+function bar() { /* ... */ }
+export { bar as foo } // Multiple exports of name 'foo'.
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+Enable this rule in all projects — it catches a class of mistake that is invisible to the JavaScript runtime until a consumer imports the wrong binding. There is no performance cost because the analysis is file-local.
+
+You may want to disable it in generated code where the toolchain intentionally produces duplicate exports as part of a compatibility shim. In that case, disable it only for the generated file with an inline `/* eslint-disable import/export */` comment rather than removing it project-wide.

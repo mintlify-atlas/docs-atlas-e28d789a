@@ -1,0 +1,105 @@
+---
+title: "import/no-unresolved — verify module paths resolve"
+description: "Catches imports that point to files or modules that cannot be found on the filesystem, preventing silent broken imports at runtime."
+---
+
+The `import/no-unresolved` rule ensures every import or require path can be resolved to an actual file or module on the local filesystem. It uses the same resolution logic as Node's `require.resolve`, so aliases and custom resolvers configured via [resolver plugins](https://github.com/import-js/eslint-plugin-import#resolvers) are respected. By default it checks only ES module `import` statements; enabling the `commonjs` and `amd` options extends coverage to `require()` and AMD-style `define`/`require` calls.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-unresolved": "error"
+  }
+}
+```
+
+<Note>
+  This rule is included in the `errors` and `recommended` shared configs. If you extend either config you do not need to add it manually.
+</Note>
+
+## Options
+
+<ParamField body="commonjs" type="boolean" default="false">
+  When `true`, single-argument `require(path)` calls are also checked for resolvability. Multi-argument AMD `require([...], cb)` calls remain ignored.
+</ParamField>
+
+<ParamField body="amd" type="boolean" default="false">
+  When `true`, dependency arrays in AMD `define([...], cb)` and `require([...], cb)` calls are resolved. Single-argument `require(path)` calls remain ignored unless `commonjs` is also enabled.
+</ParamField>
+
+<ParamField body="ignore" type="string[]">
+  An array of RegExp pattern strings. Import paths matching any pattern are silently skipped, even when they cannot be resolved. Useful for file types that your resolver does not handle (e.g. images, CSS).
+</ParamField>
+
+<ParamField body="caseSensitive" type="boolean" default="true">
+  On case-insensitive filesystems (e.g. macOS default), report imports whose casing does not match the actual path on disk. Set to `false` to disable this check.
+</ParamField>
+
+<ParamField body="caseSensitiveStrict" type="boolean" default="false">
+  Extends `caseSensitive` to also check the current working directory segment of resolved paths. Useful when running on a case-insensitive OS but deploying to Linux.
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+
+```js ✅ Valid
+import { add } from './math'         // resolves fine
+import _ from 'lodash'               // node_modules found
+
+// With { commonjs: true }
+const fs = require('fs')
+```
+
+```js ❌ Invalid
+import { add } from './maths'        // typo — file not found
+
+// With { commonjs: true }
+const helper = require('./helpr')    // './helpr' cannot be resolved
+```
+
+</CodeGroup>
+
+### Ignoring unresolvable paths
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-unresolved": ["error", { "ignore": ["\\.svg$", "\\.png$"] }]
+  }
+}
+```
+
+```js
+import logo from './assets/logo.svg'  // ✅ skipped — matches ignore pattern
+```
+
+### CommonJS and AMD support
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-unresolved": ["error", { "commonjs": true, "amd": true }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+const path = require('path')
+define(['lodash'], function (_) { /* … */ })
+```
+
+```js ❌ Invalid
+const x = require('./missing-file')
+define(['./also-missing'], function (m) { /* … */ })
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+Enable this rule in all projects — catching broken import paths statically is nearly always preferable to a runtime crash. You may want to disable or configure `ignore` when using a bundler with non-standard resolution (e.g. Webpack aliases) and you have not configured a matching [resolver plugin](https://github.com/import-js/eslint-plugin-import#resolvers), or when importing asset file types (images, fonts, CSS) that Node resolvers cannot find.

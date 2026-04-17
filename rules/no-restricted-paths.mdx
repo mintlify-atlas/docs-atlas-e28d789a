@@ -1,0 +1,144 @@
+---
+title: "import/no-restricted-paths — enforce import boundaries"
+description: "Prevents files in a target directory from importing from a restricted source directory, enforcing architectural boundaries like client/server separation."
+---
+
+The `import/no-restricted-paths` rule lets you define **zones** — pairs of a target directory and a forbidden source directory. Any file inside the target that tries to import from the source triggers a violation. This is useful for enforcing architectural boundaries in a monorepo or full-stack application, such as preventing client-side code from importing server-only modules.
+
+Paths in `target` and `from` are resolved against `basePath` (defaulting to the current working directory) and are **not** matched against the raw import string — they are compared against the fully resolved path of the imported file.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-restricted-paths": ["error", {
+      "zones": [
+        { "target": "./client", "from": "./server" }
+      ]
+    }]
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config. Add it manually to enforce custom path restrictions.
+</Warning>
+
+## Options
+
+<ParamField body="zones" type="object[]" required>
+  An array of restriction zone objects. Each zone must include `target` and `from`, and may include `except` and `message`.
+</ParamField>
+
+<ParamField body="zones[].target" type="string | string[]">
+  The file(s) in which imports are restricted. Accepts a directory path (matches all files recursively), a glob pattern, or an array of either. Files matching `target` cannot import from `from`.
+</ParamField>
+
+<ParamField body="zones[].from" type="string | string[]">
+  The path(s) that cannot be imported by files in `target`. Accepts a directory path, a glob pattern, or an array of one type (arrays cannot mix directories and globs).
+</ParamField>
+
+<ParamField body="zones[].except" type="string[]">
+  Optional. Paths that are exempt from the `from` restriction. When `from` is a glob array, `except` entries must also be globs. When `from` is a directory, `except` paths are relative to `from` and cannot escape to a parent directory.
+</ParamField>
+
+<ParamField body="zones[].message" type="string">
+  Optional. Custom message appended to the default violation report.
+</ParamField>
+
+<ParamField body="basePath" type="string" default="process.cwd()">
+  Base directory used to resolve all relative paths in `target`, `from`, and `except`.
+</ParamField>
+
+## Examples
+
+### Client / server separation
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-restricted-paths": ["error", {
+      "zones": [{ "target": "./client", "from": "./server" }]
+    }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+// server/bar.js — server can import from client
+import baz from '../client/baz'
+```
+
+```js ❌ Invalid
+// client/foo.js — client cannot import from server
+import bar from '../server/bar'
+```
+
+</CodeGroup>
+
+### Allowing exceptions within a restricted zone
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-restricted-paths": ["error", {
+      "zones": [{
+        "target": "./server/one",
+        "from": "./server",
+        "except": ["./one"],
+        "message": "Do not cross module boundaries inside /server."
+      }]
+    }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+// server/one/a.js — same sub-directory is in the except list
+import b from './b'
+```
+
+```js ❌ Invalid
+// server/one/a.js — other server sub-dirs are restricted
+import a from '../two/a'
+```
+
+</CodeGroup>
+
+### Using glob patterns
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-restricted-paths": ["error", {
+      "zones": [{
+        "target": "./client/!(sub-module)/**/*",
+        "from": "./client/sub-module/**/*"
+      }]
+    }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+// client/sub-module/bar.js — internal imports within the sub-module are fine
+import baz from './baz'
+```
+
+```js ❌ Invalid
+// client/foo.js — outside files cannot reach into sub-module
+import a from './sub-module/baz'
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+Use this rule to enforce architectural constraints that are hard to maintain manually — for example, preventing a shared utilities layer from depending on application-layer code, or keeping server-only secrets out of browser bundles. Disable or remove individual zones when you intentionally relax a boundary.

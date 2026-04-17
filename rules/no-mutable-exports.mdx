@@ -1,0 +1,77 @@
+---
+title: "import/no-mutable-exports — forbid var/let exports"
+description: "Prevents exporting var or let bindings, ensuring consumers get a stable reference instead of a live binding the exporting module can silently reassign."
+---
+
+The `import/no-mutable-exports` rule forbids exporting bindings that were declared with `var` or `let`. Because ES module live bindings reflect reassignments in the exporting module, a consumer who imports a `let` or `var` binding may observe different values at different times — which is almost never intentional and can cause hard-to-trace bugs.
+
+The rule catches both inline export declarations (`export let count = 0`) and `export { name }` specifiers where `name` was declared with `var` or `let` in the same scope. Exported function and class declarations are not flagged, even though their identifiers are technically reassignable, because reassigning them is already covered by the built-in `no-func-assign` and `no-class-assign` rules.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-mutable-exports": "error"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config (`recommended`, `errors`, or `warnings`). Add it explicitly if you want to enforce immutable exports.
+</Warning>
+
+## Options
+
+This rule takes no options.
+
+## Examples
+
+<CodeGroup>
+
+```js ✅ Valid — immutable export declarations
+export const count = 1
+export function getCount() { return count }
+export class Counter { get value() { return count } }
+```
+
+```js ❌ Invalid — mutable export declarations
+export let count = 2   // Exporting mutable 'let' binding, use 'const' instead.
+export var total = 3   // Exporting mutable 'var' binding, use 'const' instead.
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```js ✅ Valid — const binding re-exported via specifier
+const score = 100
+export { score }
+```
+
+```js ❌ Invalid — let binding re-exported via specifier
+let score = 100
+export { score } // Exporting mutable 'let' binding, use 'const' instead.
+```
+
+</CodeGroup>
+
+### Complementary rules for function and class reassignment
+
+The rule does not currently flag exported functions or classes that are reassigned elsewhere. To cover those cases enable the following ESLint core rules alongside `no-mutable-exports`:
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-mutable-exports": "error",
+    "no-func-assign": "error",
+    "no-class-assign": "error"
+  }
+}
+```
+
+## When to use / when to disable
+
+Enable this rule in any project where modules are consumed by other modules — which is almost every modern JavaScript or TypeScript project. Mutable exported bindings are a footgun: a consumer cannot tell at a glance whether the value it received will change under it.
+
+Disable it only in environments that explicitly rely on ES module live-binding semantics for intentional shared mutable state, or in code that targets environments where `const` is not available. In practice, those situations are rare; prefer `const` plus an exported setter function as a safer alternative.

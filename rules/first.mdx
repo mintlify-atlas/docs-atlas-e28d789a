@@ -1,0 +1,106 @@
+---
+title: "import/first — keep all imports before other code"
+description: "Ensure all import and require() statements appear before any other module-level code, preventing subtle hoisting bugs from mixed declaration order."
+---
+
+The `import/first` rule reports any `import` (or `TSImportEqualsDeclaration`) statement that appears after a non-import statement at module scope. Because ES modules are always in strict mode and `import` declarations are hoisted, interleaving imports with other code is usually accidental and can lead to confusing evaluation order. The rule is **auto-fixable**: `eslint --fix` moves out-of-place imports back to the top of the file, immediately after any leading directive prologues such as `'use strict'`.
+
+```jsonc
+// .eslintrc
+{
+  "rules": {
+    "import/first": "error"
+  }
+}
+```
+
+<Note>
+  `import/first` is **not** included in the `recommended` or `warnings` shared
+  configs. Add it explicitly when you want to guarantee all imports are grouped
+  at the top of each file.
+</Note>
+
+---
+
+## Options
+
+### `"absolute-first"` *(deprecated)*
+
+<ParamField body="[0]" type={"\"absolute-first\""}>
+  Passing the string `"absolute-first"` as the first option additionally reports
+  any absolute (package) import that follows a relative import. This option is
+  deprecated — use [`import/order`](./order.mdx) for fine-grained import
+  ordering instead.
+
+  ```jsonc
+  "import/first": ["error", "absolute-first"]
+  ```
+</ParamField>
+
+---
+
+## Examples
+
+<CodeGroup>
+
+```js Valid
+import foo from './foo'
+import bar from './bar'
+
+// Module-level initializer after all imports — OK
+initWith(foo)
+```
+
+```js Valid (directives before imports are allowed)
+'use super-mega-strict'
+
+import { suchFoo } from 'lame-fake-module-name'
+```
+
+```js Invalid
+import foo from './foo'
+
+initWith(foo)          // ← non-import statement
+
+import bar from './bar' // ← reported: import after non-import code
+```
+
+</CodeGroup>
+
+### With `"absolute-first"` *(deprecated)*
+
+<CodeGroup>
+
+```js Valid (absolute-first)
+import foo from 'foo'
+import * as _ from 'lodash'
+import bar from './bar'
+```
+
+```js Invalid (absolute-first)
+import foo from 'foo'
+import bar from './bar'
+
+import * as _ from 'lodash' // ← absolute import after a relative one
+```
+
+</CodeGroup>
+
+---
+
+## Auto-fix behavior
+
+The fixer moves qualifying imports to the top of the file, immediately after the last legal import (or after any leading directive prologues if there are no prior imports). Two safety constraints apply:
+
+1. **Relative ordering is preserved.** The fixer never reorders imports relative to each other, even when `"absolute-first"` is set.
+2. **Identifier references are respected.** If an imported identifier is referenced at module scope *before* the import statement itself, that import will not be moved (since moving it could change evaluation order in a way that breaks the reference).
+
+---
+
+## When to use / when to disable
+
+**Use this rule** to prevent imports from being sprinkled throughout a file. Keeping all imports at the top makes it easy to audit dependencies at a glance and avoids subtle bugs caused by the fact that `import` declarations are hoisted but their side effects still execute at evaluation time.
+
+**Disable this rule** if your codebase uses dynamic or conditional patterns where imports must appear inline with other code, or if you prefer to co-locate an import with the code that uses it for documentation purposes.
+
+**See also**: [`import/order`](./order.mdx) for enforcing the ordering of imports that are already at the top of the file.

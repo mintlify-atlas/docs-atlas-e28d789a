@@ -1,0 +1,58 @@
+---
+title: "import/default — require a matching default export"
+description: "Reports default imports when the target module has no default export, preventing the common mistake of importing a named-only module as a default."
+---
+
+The `import/default` rule checks that whenever you use a default import (`import foo from '…'`), the referenced module actually has a corresponding default export. It also validates ES2017-style `export foo from '…'` re-export syntax. Modules that are ignored via the [`import/ignore`](https://github.com/import-js/eslint-plugin-import#importignore) setting, or that cannot unambiguously be identified as ES modules, are silently skipped.
+
+This rule has **no options** — its behaviour is not configurable.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/default": "error"
+  }
+}
+```
+
+<Note>
+  This rule is included in the `errors` and `recommended` shared configs.
+</Note>
+
+## Examples
+
+Given the following modules:
+
+```js foo.js
+export default function () { return 42 }
+```
+
+```js bar.js
+export function bar() { return null }  // named export only, no default
+```
+
+```js baz.js
+module.exports = function () { /* … */ }  // CommonJS — not analysed as a default export
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+import foo from './foo'          // default export exists
+
+// node_modules are ignored by default — assumed to have a default
+import React from 'react'
+```
+
+```js ❌ Invalid
+import bar from './bar'          // no default export in ./bar
+import baz from './baz'          // CommonJS module.exports is not treated as a default export
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+Keep this rule enabled whenever you work with ES modules to catch the common mistake of importing a module that only has named exports. You may want to disable it if your project heavily uses CommonJS modules that assign to `module.exports`, since those are not currently recognised as a default export by this rule and will produce false positives.

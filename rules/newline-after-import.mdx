@@ -1,0 +1,205 @@
+---
+title: "import/newline-after-import — blank line after imports"
+description: "Require one or more empty lines after the last import or require() call, visually separating the import block from the rest of the module."
+---
+
+The `import/newline-after-import` rule ensures that at least one empty line (or a configurable number of lines) separates the last `import` or top-level `require()` statement from the rest of the file. This visual separation makes it easy to spot where the dependency declarations end and the module's implementation begins. The rule is **auto-fixable**: running `eslint --fix` inserts the required blank lines automatically.
+
+```jsonc
+// .eslintrc
+{
+  "rules": {
+    "import/newline-after-import": ["error", { "count": 1 }]
+  }
+}
+```
+
+<Note>
+  `import/newline-after-import` is **not** included in the `recommended` or
+  `warnings` shared configs. Add it explicitly when you want a mandatory blank
+  line between your imports and the rest of your module code.
+</Note>
+
+---
+
+## Options
+
+Options are passed as properties of a single configuration object.
+
+### `count`
+
+<ParamField body="count" type="integer (minimum: 1)" default="1">
+  The minimum number of empty lines required after the last import or
+  `require()` call. When `exactCount` is `false` (the default), having *more*
+  than `count` blank lines is still considered valid.
+
+  ```jsonc
+  "import/newline-after-import": ["error", { "count": 2 }]
+  ```
+</ParamField>
+
+---
+
+### `exactCount`
+
+<ParamField body="exactCount" type="boolean" default="false">
+  When `true`, the number of empty lines after the last import must be
+  **exactly** equal to `count` — neither fewer nor more.
+</ParamField>
+
+---
+
+### `considerComments`
+
+<ParamField body="considerComments" type="boolean" default="false">
+  When `true`, the rule also requires a blank line between the last import and
+  any comment that immediately follows it. When `false` (the default), a comment
+  directly below the last import is acceptable even without an intervening blank
+  line.
+</ParamField>
+
+---
+
+## Examples
+
+### Default (`count: 1`)
+
+<CodeGroup>
+
+```js Valid
+import defaultExport from './foo';
+
+const FOO = 'BAR';
+```
+
+```js Valid
+import defaultExport from './foo';
+import { bar } from 'bar-lib';
+
+const FOO = 'BAR';
+```
+
+```js Valid (require)
+const FOO = require('./foo');
+const BAR = require('./bar');
+
+const BAZ = 1;
+```
+
+```js Invalid
+import * as foo from 'foo'
+const FOO = 'BAR';  // ← no blank line after import
+```
+
+```js Invalid
+import * as foo from 'foo';
+const FOO = 'BAR';
+
+import { bar } from 'bar-lib'; // ← import after non-import code
+```
+
+```js Invalid (require)
+const FOO = require('./foo');
+const BAZ = 1;
+const BAR = require('./bar'); // ← require after non-require code
+```
+
+</CodeGroup>
+
+---
+
+### With `count: 2`
+
+<CodeGroup>
+
+```js Valid (count: 2)
+import defaultExport from './foo';
+
+
+const FOO = 'BAR';
+```
+
+```js Valid (count: 2, more than 2 is also OK when exactCount is false)
+import defaultExport from './foo';
+
+
+
+const FOO = 'BAR';
+```
+
+```js Invalid (count: 2)
+import defaultExport from './foo';
+const FOO = 'BAR';  // ← zero blank lines, need at least 2
+```
+
+```js Invalid (count: 2)
+import defaultExport from './foo';
+
+const FOO = 'BAR';  // ← only 1 blank line, need at least 2
+```
+
+</CodeGroup>
+
+---
+
+### With `count: 2` and `exactCount: true`
+
+<CodeGroup>
+
+```js Valid (count: 2, exactCount: true)
+import defaultExport from './foo';
+
+
+const FOO = 'BAR';
+```
+
+```js Invalid (count: 2, exactCount: true — too few)
+import defaultExport from './foo';
+
+const FOO = 'BAR';
+```
+
+```js Invalid (count: 2, exactCount: true — too many)
+import defaultExport from './foo';
+
+
+
+const FOO = 'BAR';
+```
+
+</CodeGroup>
+
+---
+
+### With `considerComments`
+
+<CodeGroup>
+
+```js Valid (considerComments: false, default)
+import defaultExport from './foo'
+// comment immediately below is fine
+const FOO = 'BAR'
+```
+
+```js Valid (considerComments: true)
+import defaultExport from './foo'
+
+// blank line required before comment
+const FOO = 'BAR'
+```
+
+```js Invalid (considerComments: true)
+import defaultExport from './foo'
+// ← no blank line before this comment
+const FOO = 'BAR'
+```
+
+</CodeGroup>
+
+---
+
+## When to use / when to disable
+
+**Use this rule** to enforce a visual boundary between the import block and the module's implementation, making files easier to navigate at a glance.
+
+**Disable this rule** if you prefer to co-locate imports visually with the code that uses them, or if you rely on an autoformatter (e.g. Prettier) to manage whitespace and do not want a separate linting layer enforcing blank lines.

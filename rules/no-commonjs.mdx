@@ -1,0 +1,138 @@
+---
+title: "import/no-commonjs — disallow require and module.exports"
+description: "Flags CommonJS require() calls and module.exports or exports.* assignments, helping enforce a consistent ES module style across your codebase."
+---
+
+The `import/no-commonjs` rule reports single-string-argument `require()` calls and any assignment to `module.exports` or `exports.*`. It is intended for projects migrating from CommonJS to pure ES modules — once enabled, the rule surfaces every remaining CommonJS boundary so you can work through them systematically. By default, conditional `require()` calls (inside `if`, `try`, or logical expressions) are allowed; use `allowConditionalRequire: false` to tighten the check. The rule does **not** report multi-argument `require` calls or calls where the argument is not a literal string.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-commonjs": "error"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config (`recommended`, `errors`, etc.). Add it explicitly when you want to enforce ES module style.
+</Warning>
+
+## Options
+
+<ParamField body="allowRequire" type="boolean" default="false">
+  When `true`, `require()` calls are permitted and only `module.exports` / `exports.*` assignments are reported. Useful when you want to migrate exports first while leaving imports until later.
+</ParamField>
+
+<ParamField body="allowConditionalRequire" type="boolean" default="true">
+  When `true` (the default), `require()` calls inside conditional branches — `if`, `try/catch`, logical expressions, and ternaries — are not reported. Set to `false` to report all `require()` calls regardless of context.
+</ParamField>
+
+<ParamField body="allowPrimitiveModules" type="boolean" default="false">
+  When `true`, `module.exports = <non-object>` assignments are allowed. This covers common patterns like exporting a single function or string (e.g. ESLint rule modules). Assignments to `exports.*` and `module.exports = { … }` (object) are still reported.
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+
+```js ✅ Valid — ES module syntax
+import mod from './mod'
+import common from './common'
+import fs from 'fs'
+
+export default { a: 'b' }
+export const c = 'd'
+```
+
+```js ❌ Invalid — CommonJS syntax
+var mod = require('./mod')
+var common = require('./common')
+var fs = require('fs')
+var whateverModule = require('./not-found')
+
+module.exports = { a: 'b' }
+exports.c = 'd'
+```
+
+</CodeGroup>
+
+### Allowing `require()` but not `module.exports`
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-commonjs": ["error", { "allowRequire": true }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid — require is allowed
+var mod = require('./mod')
+```
+
+```js ❌ Invalid — module.exports is still reported
+module.exports = { a: 'b' }
+```
+
+</CodeGroup>
+
+### Reporting conditional `require()`
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-commonjs": ["error", { "allowConditionalRequire": false }]
+  }
+}
+```
+
+```js ❌ Invalid — conditional require is reported when allowConditionalRequire is false
+var a = b && require('c')
+
+if (typeof window !== 'undefined') {
+  require('that-ugly-thing')
+}
+
+var fs = null
+try {
+  fs = require('fs')
+} catch (error) {}
+```
+
+### Allowing primitive `module.exports`
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-commonjs": ["error", { "allowPrimitiveModules": true }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid — non-object exports are allowed
+module.exports = 'foo'
+module.exports = function rule(context) { return { /* … */ } }
+```
+
+```js ❌ Invalid — object exports and exports.* are still reported
+module.exports = { x: 'y' }
+exports.z = function boop() { /* … */ }
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+Enable this rule when you want your project to use only ES module syntax (`import` / `export`). It works best when you can commit to full ES module output — for example, when targeting a bundler or a Node.js version that supports ESM natively.
+
+Disable or avoid this rule if:
+
+- Your codebase is large and you have not yet completed the CommonJS → ESM migration. The rule can be very noisy during a transition.
+- You intentionally mix module systems (e.g. a hybrid package that ships both CJS and ESM entry points).
+- You rely on conditional `require()` for platform detection or lazy loading; consider enabling `allowConditionalRequire` (the default) rather than disabling the rule entirely.

@@ -1,0 +1,347 @@
+---
+title: "import/order — enforce a consistent import order"
+description: "Enforce a consistent import ordering by group — builtin, external, internal, parent, sibling, index, type — with alphabetization and newline control."
+---
+
+The `import/order` rule enforces a conventional ordering for `import` and `require()` statements. Imports are sorted into named groups — such as Node.js builtins, external packages, and local modules — and the rule reports any import whose position in the file violates the configured order. When the optional `alphabetize` setting is enabled, imports are also sorted lexicographically within each group. The rule is **auto-fixable**: running `eslint --fix` will reorder imports to satisfy the configured constraints, with the exception of unassigned (side-effect) imports, which are never moved automatically because their order may be semantically significant.
+
+```jsonc
+// .eslintrc
+{
+  "rules": {
+    "import/order": ["error", {
+      "groups": ["builtin", "external", "internal", "parent", "sibling", "index", "object", "type"],
+      "newlines-between": "always",
+      "alphabetize": { "order": "asc", "caseInsensitive": true }
+    }]
+  }
+}
+```
+
+<Note>
+  `import/order` is **not** included in the `recommended` or `warnings` shared
+  configs. Add it explicitly to enforce import ordering in your project.
+</Note>
+
+---
+
+## Options
+
+All options are optional. Pass them as properties of a single configuration object.
+
+### `groups`
+
+<ParamField body="groups" type={"(\"builtin\" | \"external\" | \"internal\" | \"unknown\" | \"parent\" | \"sibling\" | \"index\" | \"object\" | \"type\")[]"} default={"[\"builtin\", \"external\", \"parent\", \"sibling\", \"index\"]"}>
+  Defines which import groups are recognized and the order they must appear in.
+  Imports belonging to groups omitted from this array are lumped together at the
+  end. Groups can also be nested inside a sub-array to allow them to be
+  interleaved freely with each other.
+
+  | Group | Description |
+  |-------|-------------|
+  | `"builtin"` | Node.js core modules (`fs`, `path`, …) |
+  | `"external"` | npm packages from `node_modules` |
+  | `"internal"` | Imports resolved inside the project root (e.g. path aliases) |
+  | `"parent"` | Relative imports going up the directory tree (`../`) |
+  | `"sibling"` | Relative imports in the same directory (`./`) |
+  | `"index"` | Index file imports (`.`, `./index`, `./index.js`) |
+  | `"object"` | TypeScript `import =` declarations |
+  | `"type"` | Flow/TypeScript type-only imports |
+  | `"unknown"` | Absolute path imports not matching any other group |
+</ParamField>
+
+**Full practical example** showing every predefined group:
+
+```jsonc
+{
+  "import/order": ["error", {
+    "groups": [
+      "builtin",        // 1. node built-ins: fs, path, …
+      "external",       // 2. npm packages: lodash, react, …
+      "internal",       // 3. path-aliased internal modules: src/foo
+      ["parent", "sibling"], // 4. relative: ../foo and ./bar interleaved
+      "index",          // 5. ./index or .
+      "object",         // 6. TypeScript import = declarations
+      "type"            // 7. import type { … }
+    ]
+  }]
+}
+```
+
+---
+
+### `pathGroups`
+
+<ParamField body="pathGroups" type="PathGroup[]" default="[]">
+  Defines custom sub-groups relative to a predefined group. Imports are matched
+  against each `PathGroup` pattern using [minimatch](https://github.com/isaacs/minimatch).
+
+  Each `PathGroup` object supports the following properties:
+
+  | Property | Required | Type | Description |
+  |----------|----------|------|-------------|
+  | `pattern` | ✓ | `string` | Minimatch glob to match against the import specifier |
+  | `patternOptions` | | `object` | Minimatch options; default `{ nocomment: true }` |
+  | `group` | ✓ | predefined group | The predefined group this `PathGroup` is relative to |
+  | `position` | | `"before" \| "after"` | Where to place matching imports relative to `group` |
+
+  ```jsonc
+  {
+    "import/order": ["error", {
+      "pathGroups": [
+        {
+          "pattern": "~/**",
+          "group": "external",
+          "position": "after"
+        }
+      ]
+    }]
+  }
+  ```
+
+  <Warning>
+    By default, imports categorized as `"builtin"`, `"external"`, or `"object"`
+    are **excluded** from `pathGroups` matching. Use
+    `pathGroupsExcludedImportTypes` to change this behavior.
+  </Warning>
+</ParamField>
+
+---
+
+### `pathGroupsExcludedImportTypes`
+
+<ParamField body="pathGroupsExcludedImportTypes" type={"(\"builtin\" | \"external\" | \"internal\" | \"unknown\" | \"parent\" | \"sibling\" | \"index\" | \"object\" | \"type\")[]"} default={"[\"builtin\", \"external\", \"object\"]"}>
+  Controls which predefined groups are excluded from `pathGroups` matching to
+  prevent overeager sorting. Remove a group from this list to allow
+  `pathGroups` patterns to match its imports.
+
+  This is especially useful when you use import aliases that resolve as
+  `"external"` imports (e.g. with `eslint-import-resolver-alias` or `paths`
+  in `tsconfig.json`).
+
+  ```jsonc
+  {
+    "import/order": ["error", {
+      "pathGroups": [
+        { "pattern": "@app/**", "group": "external", "position": "after" }
+      ],
+      "pathGroupsExcludedImportTypes": ["builtin"]
+    }]
+  }
+  ```
+</ParamField>
+
+---
+
+### `newlines-between`
+
+<ParamField body="newlines-between" type={"\"ignore\" | \"always\" | \"always-and-inside-groups\" | \"never\""} default={"\"ignore\""}>
+  Controls whether empty lines are required or forbidden between import groups.
+
+  | Value | Behavior |
+  |-------|----------|
+  | `"ignore"` | No newline-related errors reported |
+  | `"always"` | At least one empty line required between groups; none allowed within a group |
+  | `"always-and-inside-groups"` | Like `"always"` but empty lines are permitted inside groups |
+  | `"never"` | No empty lines anywhere in the import block |
+</ParamField>
+
+---
+
+### `alphabetize`
+
+<ParamField body="alphabetize" type="object" default={"{ order: \"ignore\", orderImportKind: \"ignore\", caseInsensitive: false }"}>
+  Sorts imports alphabetically by their specifier within each group or path group.
+
+  <ParamField body="alphabetize.order" type={"\"asc\" | \"desc\" | \"ignore\""} default={"\"ignore\""}>
+    Sort direction for import specifiers. Alphabetization is applied to the
+    module specifier string, not to the local identifier name.
+  </ParamField>
+
+  <ParamField body="alphabetize.orderImportKind" type={"\"asc\" | \"desc\" | \"ignore\""} default={"\"ignore\""}>
+    Sort direction for import _kinds_ within a specifier (e.g. `type` vs.
+    `typeof` imports from the same module).
+  </ParamField>
+
+  <ParamField body="alphabetize.caseInsensitive" type="boolean" default="false">
+    When `true`, alphabetization ignores letter case differences.
+  </ParamField>
+</ParamField>
+
+---
+
+### `named`
+
+<ParamField body="named" type={"boolean | { enabled: boolean, import?: boolean, export?: boolean, require?: boolean, cjsExports?: boolean, types?: \"mixed\" | \"types-first\" | \"types-last\" }"} default="false">
+  When `true` (or `{ enabled: true }`), enforces alphabetical ordering of named
+  specifiers within an import or export statement, according to the `alphabetize`
+  setting.
+
+  Set to an object for fine-grained control:
+
+  | Property | Type | Description |
+  |----------|------|-------------|
+  | `import` | `boolean` | Apply to `import { … }` statements |
+  | `export` | `boolean` | Apply to `export { … }` statements |
+  | `require` | `boolean` | Apply to `const { … } = require()` |
+  | `cjsExports` | `boolean` | Apply to `module.exports = { … }` |
+  | `types` | `"mixed" \| "types-first" \| "types-last"` | Order of inline type specifiers |
+</ParamField>
+
+---
+
+### `warnOnUnassignedImports`
+
+<ParamField body="warnOnUnassignedImports" type="boolean" default="false">
+  When `true`, reports unassigned imports (e.g. `import './styles.css'`) that
+  appear out of order. These warnings are never auto-fixable because unassigned
+  imports may rely on side-effect ordering.
+</ParamField>
+
+---
+
+### `distinctGroup`
+
+<ParamField body="distinctGroup" type="boolean" default="true">
+  Controls whether `pathGroups` with a `position` property create a distinct
+  visual sub-group (separated by newlines when `newlines-between` is `"always"`).
+  Set to `false` to use `position` purely for ordering within the parent group
+  without inserting an extra blank line.
+
+  <Warning>
+    The default will change from `true` to `false` in a future major release.
+  </Warning>
+</ParamField>
+
+---
+
+### `sortTypesGroup`
+
+<ParamField body="sortTypesGroup" type="boolean" default="false">
+  When `true` (and `"type"` is in `groups`), type-only imports are sorted
+  separately from normal imports, mirroring the inter-group order defined by
+  `groups`. Requires `"type"` to be present in `groups`.
+</ParamField>
+
+---
+
+### `newlines-between-types`
+
+<ParamField body="newlines-between-types" type={"\"ignore\" | \"always\" | \"always-and-inside-groups\" | \"never\""} default="value of newlines-between">
+  Identical to `newlines-between` but applies only to type-only import groups
+  when `sortTypesGroup` is enabled. Takes precedence over `newlines-between`
+  when determining the blank line between type imports and normal imports.
+</ParamField>
+
+---
+
+### `consolidateIslands`
+
+<ParamField body="consolidateIslands" type={"\"inside-groups\" | \"never\""} default={"\"never\""}>
+  Only meaningful when `newlines-between` or `newlines-between-types` is set to
+  `"always-and-inside-groups"`. When set to `"inside-groups"`, multi-line
+  imports are always surrounded by blank lines, while consecutive single-line
+  imports within the same group are kept together without blank lines between
+  them.
+</ParamField>
+
+---
+
+## Examples
+
+<CodeGroup>
+
+```ts Valid
+// builtin
+import fs from 'fs';
+import path from 'path';
+
+// external
+import _ from 'lodash';
+import chalk from 'chalk';
+
+// internal
+import foo from 'src/foo';
+
+// parent
+import qux from '../../foo/qux';
+
+// sibling
+import bar from './bar';
+
+// index
+import main from './';
+```
+
+```ts Invalid
+import _ from 'lodash';
+import path from 'path'; // 'path' should come before 'lodash'
+
+// -----
+
+var _ = require('lodash');
+var path = require('path'); // 'path' should come before 'lodash'
+
+// -----
+
+var path = require('path');
+import foo from './foo'; // 'import' must precede 'require'
+```
+
+</CodeGroup>
+
+### Alphabetize example
+
+```jsonc
+// eslintrc config
+{ "import/order": ["error", { "alphabetize": { "order": "asc", "caseInsensitive": true } }] }
+```
+
+<CodeGroup>
+
+```ts Valid (alphabetize: asc)
+import blist from 'BList';
+import * as classnames from 'classnames';
+import aTypes from 'prop-types';
+import React, { PureComponent } from 'react';
+import { compose, apply } from 'xcompose';
+```
+
+```ts Invalid (alphabetize: asc)
+import React, { PureComponent } from 'react';
+import aTypes from 'prop-types';
+import { compose, apply } from 'xcompose';
+import * as classnames from 'classnames';
+import blist from 'BList';
+```
+
+</CodeGroup>
+
+---
+
+## `--fix` limitations
+
+Unassigned imports (imports with no bound identifier) are treated as having side effects and are **never reordered** by the auto-fixer. If a side-effect import appears between two sorted imports, the fixer may fail to reorder the surrounding imports. Move all side-effect imports to be entirely above or below the rest to avoid this.
+
+```js
+// ❌ Blocks the fixer
+import b from 'b'
+import 'format.css';
+import a from 'a'
+
+// ✅ Side-effect imports at the boundary — fixer can proceed
+import 'format1.css';
+import a from 'a'
+import b from 'b'
+import 'format2.css';
+```
+
+---
+
+## When to use / when to disable
+
+**Use this rule** when you want to enforce a canonical import ordering across a codebase so that files are easier to scan and code reviews focus on logic rather than import placement.
+
+**Disable this rule** (or set it to `"warn"`) if your codebase has deeply embedded patterns that are difficult to migrate, or if you prefer to let a formatter like [Prettier](https://prettier.io) handle visual layout without enforcing group semantics.
+
+**Related settings**: [`import/internal-regex`](/guides/settings#importinternal-regex), [`import/core-modules`](/guides/settings#importcore-modules), [`import/external-module-folders`](/guides/settings#importexternal-module-folders).

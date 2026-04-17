@@ -1,0 +1,270 @@
+---
+title: "Configure module resolvers for eslint-plugin-import"
+description: "Set up Node, webpack, or TypeScript resolvers so eslint-plugin-import can correctly locate imported modules in your project's module system."
+---
+
+`eslint-plugin-import` needs to resolve every `import` statement to an actual file or module before it can report issues like unresolved paths or missing named exports. Because different bundlers—Node.js, webpack, Vite, TypeScript—each have their own rules for locating modules (aliases, loaders, `paths` mappings, platform extensions), a single built-in strategy is not enough. Resolvers let you tell the plugin exactly how your project finds modules, so lint results match what your toolchain actually does.
+
+## How resolvers work
+
+When the plugin encounters `import x from 'some-module'`, it passes the specifier and the importing file's path to each configured resolver in turn. The first resolver that returns `{ found: true }` wins. Resolvers are plain npm packages that export a `resolve` function and an `interfaceVersion` number—the plugin loads them at lint time via `require`.
+
+## The built-in Node resolver
+
+The Node resolver (`eslint-import-resolver-node`) is the default. You do not need to install or configure anything to use it—it mirrors Node's own `require.resolve` logic, following `node_modules`, `main` fields in `package.json`, and so on.
+
+<Note>
+The Node resolver understands Node's module algorithm. It will not follow webpack aliases, TypeScript `paths`, or platform-specific extensions unless you add the appropriate resolver alongside it.
+</Note>
+
+## The webpack resolver
+
+If your project uses webpack, install `eslint-import-resolver-webpack` and point it at your webpack config. The resolver will honour aliases, `resolve.modules`, `resolve.extensions`, and other webpack-specific settings.
+
+<Steps>
+  <Step title="Install the resolver">
+    ```bash
+    npm install eslint-import-resolver-webpack --save-dev
+    ```
+  </Step>
+
+  <Step title="Add it to your ESLint config">
+    <CodeGroup>
+
+    ```jsonc .eslintrc
+    {
+      "settings": {
+        "import/resolver": {
+          "webpack": {
+            "config": "webpack.config.js"
+          }
+        }
+      }
+    }
+    ```
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+
+    export default [
+      importPlugin.flatConfigs.recommended,
+      {
+        settings: {
+          'import/resolver': {
+            webpack: {
+              config: 'webpack.config.js',
+            },
+          },
+        },
+      },
+    ];
+    ```
+
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## The TypeScript resolver
+
+TypeScript projects need `eslint-import-resolver-typescript` so the plugin can follow `paths` aliases, `baseUrl`, `exports` maps, and `.d.ts` declaration files.
+
+<Steps>
+  <Step title="Install the resolver">
+    ```bash
+    npm install eslint-import-resolver-typescript --save-dev
+    ```
+  </Step>
+
+  <Step title="Enable it in your ESLint config">
+    <CodeGroup>
+
+    ```jsonc .eslintrc
+    {
+      "settings": {
+        "import/resolver": {
+          "typescript": true,
+          "node": true
+        }
+      }
+    }
+    ```
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+
+    export default [
+      importPlugin.flatConfigs.recommended,
+      importPlugin.flatConfigs.typescript,
+      {
+        settings: {
+          'import/resolver': {
+            typescript: true,
+            node: true,
+          },
+        },
+      },
+    ];
+    ```
+
+    </CodeGroup>
+
+    <Tip>
+      Combine `typescript: true` with `node: true` so that core Node modules like `fs` and `path` are also resolved correctly.
+    </Tip>
+  </Step>
+</Steps>
+
+## Referencing resolvers
+
+You can identify a resolver in three ways. The plugin tries them in this order of precedence:
+
+<AccordionGroup>
+  <Accordion title="Short name (eslint-import-resolver-* prefix)">
+    Any package whose full npm name is `eslint-import-resolver-<name>` can be referenced by just `<name>`. The plugin prepends the conventional prefix automatically.
+
+    <CodeGroup>
+
+    ```jsonc .eslintrc
+    {
+      "settings": {
+        "import/resolver": "foo"
+      }
+    }
+    ```
+
+    ```yaml .eslintrc.yml
+    settings:
+      import/resolver: foo
+    ```
+
+    ```js .eslintrc.js
+    module.exports = {
+      settings: {
+        'import/resolver': {
+          foo: { someConfig: 'value' },
+        },
+      },
+    };
+    ```
+
+    </CodeGroup>
+
+    The example above loads `eslint-import-resolver-foo`.
+  </Accordion>
+
+  <Accordion title="Full npm package name">
+    Any installed package name works as a resolver key, not just those following the `eslint-import-resolver-*` convention.
+
+    <CodeGroup>
+
+    ```jsonc .eslintrc
+    {
+      "settings": {
+        "import/resolver": "my-awesome-npm-module"
+      }
+    }
+    ```
+
+    ```js .eslintrc.js
+    module.exports = {
+      settings: {
+        'import/resolver': {
+          'my-awesome-npm-module': { someConfig: 'value' },
+        },
+      },
+    };
+    ```
+
+    </CodeGroup>
+  </Accordion>
+
+  <Accordion title="Filesystem path">
+    Pass an absolute or relative path to load a local resolver. Relative paths are resolved from the nearest `package.json`, or the current working directory if none is found.
+
+    ```js .eslintrc.js
+    const path = require('path');
+
+    module.exports = {
+      settings: {
+        'import/resolver': {
+          [path.resolve('../../../my-resolver')]: { someConfig: 'value' },
+        },
+      },
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Using multiple resolvers
+
+List multiple resolvers to handle different module types. The plugin queries them left-to-right and stops at the first `{ found: true }` response.
+
+```jsonc .eslintrc
+{
+  "settings": {
+    "import/resolver": {
+      "typescript": true,
+      "node": true
+    }
+  }
+}
+```
+
+```yaml .eslintrc.yml
+settings:
+  import/resolver:
+    my-cool-resolver:
+      - some
+      - stuff
+    node:
+      paths:
+        - a
+        - b
+        - c
+```
+
+## Writing a custom resolver
+
+A resolver is a CommonJS module that exports two names:
+
+<CodeGroup>
+
+```js my-resolver.js
+var resolve = require('resolve/sync');
+var isCoreModule = require('is-core-module');
+
+// Tell the plugin which interface version this resolver implements.
+exports.interfaceVersion = 2;
+
+/**
+ * @param {string} source  - the module specifier, e.g. './imported-file'
+ * @param {string} file    - absolute path of the importing file
+ * @param {object} config  - value from import/resolver setting for this key
+ * @returns {{ found: boolean, path: string | null }}
+ */
+exports.resolve = function (source, file, config) {
+  if (isCoreModule(source)) {
+    // Core modules are always found; no path needed.
+    return { found: true, path: null };
+  }
+  try {
+    return { found: true, path: resolve(source, opts(file, config)) };
+  } catch (err) {
+    return { found: false };
+  }
+};
+```
+
+</CodeGroup>
+
+<Info>
+The `interfaceVersion` export is required. The current spec is version 2. If omitted, the plugin assumes version 1.
+</Info>
+
+Key points from the [resolver spec](https://github.com/import-js/eslint-plugin-import/blob/main/resolvers/README.md):
+
+- Return `{ found: true, path: null }` for core modules that have no filesystem path.
+- Return `{ found: false }` when the specifier cannot be resolved—omit `path` entirely.
+- The first resolver to return `{ found: true }` is treated as authoritative; subsequent resolvers are not called.
+
+See the [community resolver list](https://github.com/import-js/eslint-plugin-import/wiki/Resolvers) for third-party resolvers covering Babel, Parcel, Jest, and more.

@@ -1,0 +1,53 @@
+---
+title: "import/no-amd — forbid AMD require and define calls"
+description: "Reports AMD-style require([], fn) and define([], fn) calls at module scope, guiding codebases away from AMD toward standard ES module syntax."
+---
+
+The `import/no-amd` rule flags AMD-style `require([array], callback)` and `define([array], callback)` calls at module scope. These patterns originate from RequireJS and older bundler conventions; modern projects should use ES `import` statements instead. The rule only triggers when the call has exactly two arguments and the first argument is a literal array, matching the canonical AMD signature. Single-argument CommonJS `require('path')` calls are not affected by this rule.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-amd": "error"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config (`recommended`, `errors`, etc.). Add it explicitly when migrating away from AMD module syntax.
+</Warning>
+
+## Options
+
+This rule has no configurable options. The schema is empty — simply set it to `"error"` or `"warn"`.
+
+## Examples
+
+<CodeGroup>
+
+```js ✅ Valid — ES module syntax and CommonJS require
+import a from './a'
+import b from './b'
+
+// Single-argument CommonJS require is not reported
+var fs = require('fs')
+```
+
+```js ❌ Invalid — AMD define and require
+define(['a', 'b'], function (a, b) { /* … */ })
+
+require(['b', 'c'], function (b, c) { /* … */ })
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+Enable this rule when your project has moved past RequireJS or another AMD loader and you want to prevent regressions to AMD syntax. It pairs well with [`import/no-commonjs`](/rules/no-commonjs) when enforcing a fully ES-module codebase.
+
+Disable this rule if:
+
+- Your project still relies on RequireJS or an AMD-compatible build pipeline.
+- You are in the middle of a large AMD → ESM migration and want to enable the rule only incrementally across directories.

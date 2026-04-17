@@ -1,0 +1,75 @@
+---
+title: "import/no-nodejs-modules — ban Node.js built-in imports"
+description: "Prevents importing Node.js built-in modules like fs, path, or crypto, keeping browser-targeted or isomorphic code free of Node-only dependencies."
+---
+
+The `import/no-nodejs-modules` rule reports any `import` statement or `require()` call that references a Node.js built-in module — for example `fs`, `path`, `crypto`, or `http`. This is useful for client-side web projects where Node built-ins are unavailable at runtime and should never appear in source code. The rule uses the same built-in detection as the rest of the plugin, so it correctly identifies both the bare (`'fs'`) and the prefixed (`'node:fs'`) forms. You can whitelist specific built-ins via the `allow` option for cases where a module is polyfilled or intentionally available.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-nodejs-modules": "error"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config (`recommended`, `errors`, etc.). Add it explicitly for browser-targeted projects.
+</Warning>
+
+## Options
+
+<ParamField body="allow" type="string[]" default="[]">
+  An array of built-in module names that are allowed. Modules listed here are not reported even though they are Node.js built-ins. Useful when a polyfill or bundler shim makes a built-in available in non-Node environments.
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+
+```js ✅ Valid — third-party and relative imports
+import _ from 'lodash'
+import foo from 'foo'
+import foo from './foo'
+
+var _ = require('lodash')
+var foo = require('foo')
+var foo = require('./foo')
+```
+
+```js ❌ Invalid — Node.js built-in modules
+import fs from 'fs'
+import path from 'path'
+
+var fs = require('fs')
+var path = require('path')
+```
+
+</CodeGroup>
+
+### Allowing specific built-ins
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-nodejs-modules": ["error", { "allow": ["path"] }]
+  }
+}
+```
+
+```js ✅ Valid — path is explicitly allowed
+import path from 'path'
+
+// fs is still forbidden
+```
+
+## When to use / when to disable
+
+Enable this rule for projects that run entirely in the browser and have no server-side code. It catches accidental Node-only imports that would silently fail or require a bundler shim at build time.
+
+Disable this rule if:
+
+- Your project runs in Node.js or targets both Node and the browser. Most Node server projects and universal/isomorphic apps intentionally import built-ins.
+- You are using a bundler that already polyfills all Node built-ins for your target environment and you have verified those polyfills are correct.

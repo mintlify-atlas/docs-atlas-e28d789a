@@ -1,28 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "eslint-plugin-import",
+  "projectType": "sdk-library",
+  "projectName": "eslint-plugin-import",
+  "projectDescription": "An ESLint plugin that lints ES2015+ import/export syntax to prevent misspellings, missing files, and incorrect imports.",
   "theme": "luma",
-  "colors": {
-    "primary": "#848c8e",
-    "light": "#11161e",
-    "dark": "#cfd0d2"
-  },
-  "favicon": "https://media.brand.dev/2b01fe20-c04b-4a1d-a2f9-1d2789c50a7a.jpg",
-  "logo": {
-    "light": "https://media.brand.dev/5ffd6ce4-2434-4b4b-920a-f8cacac8b48b.svg",
-    "dark": "https://media.brand.dev/5ffd6ce4-2434-4b4b-920a-f8cacac8b48b.svg"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/import-js/eslint-plugin-import"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/import-js/eslint-plugin-import"
-    }
-  },
+  "primaryColor": "#848c8e",
+  "lightColor": "#11161e",
+  "darkColor": "#cfd0d2",
   "navigation": {
     "tabs": [
       {
@@ -95,5 +78,34 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "46 lint rules for ES2015+ import/export syntax",
+    "Static analysis to detect unresolved imports and missing exports",
+    "Configurable module resolvers (Node, webpack, TypeScript)",
+    "Shared configs: recommended, errors, warnings, typescript, react",
+    "Support for both legacy (.eslintrc) and flat (eslint.config.js) ESLint config formats",
+    "Import ordering and style enforcement",
+    "Circular dependency detection",
+    "TypeScript-aware linting with custom parsers"
+  ],
+  "publicApiSurface": [
+    "rules.no-unresolved",
+    "rules.named",
+    "rules.default",
+    "rules.namespace",
+    "rules.export",
+    "rules.no-cycle",
+    "rules.order",
+    "rules.no-duplicates",
+    "rules.no-extraneous-dependencies",
+    "rules.no-unused-modules",
+    "configs.recommended",
+    "configs.errors",
+    "configs.warnings",
+    "configs.typescript",
+    "configs.react",
+    "flatConfigs.recommended",
+    "flatConfigs.typescript"
+  ]
 }

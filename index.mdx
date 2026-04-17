@@ -1,97 +1,85 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "eslint-plugin-import: Lint ES2015+ imports with confidence"
+description: "eslint-plugin-import validates ES2015+ import/export syntax, catches missing files, prevents path typos, and enforces a consistent import style."
 ---
 
-## Setting up
+`eslint-plugin-import` brings static analysis to your ES2015+ `import` and `export` statements. It catches broken module paths, mismatched named exports, circular dependencies, and style inconsistencies — all before your code runs.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install the plugin and enable the recommended config in under five minutes.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Configuration" icon="sliders" href="/configuration">
+    Learn how to configure the plugin with legacy .eslintrc or flat eslint.config.js.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Resolvers" icon="magnifying-glass" href="/guides/resolvers">
+    Configure Node, webpack, or TypeScript resolvers to match your module system.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="All Rules" icon="list-check" href="/rules/no-unresolved">
+    Browse all 46 rules across Static Analysis, Warnings, Module Systems, and Style.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What it does
 
-Everything you need to create world-class documentation.
+`eslint-plugin-import` provides 46 rules organized into four categories:
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Static Analysis" icon="microscope" href="/rules/no-unresolved">
+    Verify that imports resolve to real files, named exports exist, and there are no circular dependencies.
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Helpful Warnings" icon="triangle-exclamation" href="/rules/export">
+    Detect duplicate exports, deprecated imports, extraneous dependencies, and mutable exports.
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Module Systems" icon="cube" href="/rules/no-commonjs">
+    Enforce or prohibit CommonJS `require`, AMD `define`, and Node.js built-in module usage.
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="Style Guide" icon="paintbrush" href="/rules/order">
+    Enforce import ordering, grouping, newlines, extensions, and namespace conventions.
   </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## Get started
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Steps>
+  <Step title="Install the plugin">
+    Add `eslint-plugin-import` as a dev dependency to your project.
+
+    ```bash
+    npm install eslint-plugin-import --save-dev
+    ```
+  </Step>
+  <Step title="Enable the recommended config">
+    Extend `plugin:import/recommended` in your ESLint config to enable the most useful rules immediately.
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+
+    export default [
+      importPlugin.flatConfigs.recommended,
+    ];
+    ```
+  </Step>
+  <Step title="Add a resolver">
+    Configure a resolver so the plugin can find your modules. The Node resolver is included by default.
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+
+    export default [
+      importPlugin.flatConfigs.recommended,
+      {
+        settings: {
+          'import/resolver': {
+            node: true,
+          },
+        },
+      },
+    ];
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  `eslint-plugin-import` supports ESLint v2 through v9, including the modern flat config format introduced in ESLint v9.
+</Note>

@@ -1,0 +1,362 @@
+---
+title: "Configure eslint-plugin-import rules and options"
+description: "Learn how to enable rules individually or extend shared configs in eslint-plugin-import using legacy .eslintrc or flat eslint.config.js configuration formats."
+---
+
+`eslint-plugin-import` ships with all rules off by default. You enable them either by extending one of the plugin's shared configs, which bundle a curated set of rules at predefined severities, or by enabling individual rules directly in your ESLint configuration. Both the legacy `.eslintrc` format and the modern flat `eslint.config.js` format are supported throughout.
+
+## Extending shared configs vs. enabling rules manually
+
+The easiest way to get started is to extend a shared config. The `recommended` config enables the eight most broadly useful rules and is a good default for most projects. If you need more control, you can skip the shared config and enable rules one at a time.
+
+<Tabs>
+  <Tab title="Flat config (eslint.config.js)">
+    **Extending the recommended config:**
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+    import js from '@eslint/js';
+
+    export default [
+      js.configs.recommended,
+      importPlugin.flatConfigs.recommended,
+    ];
+    ```
+
+    **Configuring rules manually:**
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+
+    export default [
+      {
+        plugins: { import: importPlugin },
+        rules: {
+          'import/no-unresolved': ['error', { commonjs: true, amd: true }],
+          'import/named': 'error',
+          'import/namespace': 'error',
+          'import/default': 'error',
+          'import/export': 'error',
+        },
+      },
+    ];
+    ```
+  </Tab>
+  <Tab title="Legacy config (.eslintrc)">
+    **Extending the recommended config:**
+
+    ```jsonc .eslintrc.json
+    {
+      "extends": [
+        "eslint:recommended",
+        "plugin:import/recommended"
+      ]
+    }
+    ```
+
+    **Configuring rules manually:**
+
+    ```jsonc .eslintrc.json
+    {
+      "rules": {
+        "import/no-unresolved": ["error", { "commonjs": true, "amd": true }],
+        "import/named": "error",
+        "import/namespace": "error",
+        "import/default": "error",
+        "import/export": "error"
+      }
+    }
+    ```
+
+    <Note>
+      When configuring rules manually in the legacy format, you must also add `"import"` to the `"plugins"` array so ESLint loads the plugin. The shared config presets handle this automatically.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Rule severity levels
+
+Each rule can be set to one of three severity strings (or their numeric equivalents):
+
+| Severity | Numeric | Behavior |
+|----------|---------|----------|
+| `"error"` | `2` | Lint failure; exits with a non-zero code |
+| `"warn"` | `1` | Reported in output but does not affect exit code |
+| `"off"` | `0` | Rule is disabled |
+
+Some rules accept an options object as the second element of the array form:
+
+```jsonc
+"import/no-unresolved": ["error", { "commonjs": true, "amd": true }]
+```
+
+## Available shared configs
+
+The plugin provides several shared configs for different environments and use cases. Each config is available in both the legacy format (via `plugin:import/<name>`) and the flat config format (via `importPlugin.flatConfigs.<name>`).
+
+<AccordionGroup>
+  <Accordion title="recommended">
+    The standard starting point. Enables five error-level static analysis rules and three warning-level rules that flag common anti-patterns.
+
+    Rules enabled as `error`: `no-unresolved`, `named`, `namespace`, `default`, `export`
+
+    Rules enabled as `warn`: `no-named-as-default`, `no-named-as-default-member`, `no-duplicates`
+
+    <Tabs>
+      <Tab title="Flat config">
+        ```js eslint.config.js
+        import importPlugin from 'eslint-plugin-import';
+
+        export default [importPlugin.flatConfigs.recommended];
+        ```
+      </Tab>
+      <Tab title="Legacy config">
+        ```jsonc .eslintrc.json
+        {
+          "extends": ["plugin:import/recommended"]
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="errors">
+    A subset of `recommended` containing only the error-level static analysis rules: `no-unresolved`, `named`, `namespace`, `default`, and `export`. Use this when you want static analysis errors without any warnings.
+
+    <Tabs>
+      <Tab title="Flat config">
+        ```js eslint.config.js
+        import importPlugin from 'eslint-plugin-import';
+
+        export default [importPlugin.flatConfigs.errors];
+        ```
+      </Tab>
+      <Tab title="Legacy config">
+        ```jsonc .eslintrc.json
+        {
+          "extends": ["plugin:import/errors"]
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="warnings">
+    Contains only the warning-level rules from `recommended`: `no-named-as-default`, `no-named-as-default-member`, and `no-duplicates`.
+
+    <Tabs>
+      <Tab title="Flat config">
+        ```js eslint.config.js
+        import importPlugin from 'eslint-plugin-import';
+
+        export default [importPlugin.flatConfigs.warnings];
+        ```
+      </Tab>
+      <Tab title="Legacy config">
+        ```jsonc .eslintrc.json
+        {
+          "extends": ["plugin:import/warnings"]
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="typescript">
+    Adjusts the `recommended` ruleset for TypeScript projects. Disables `import/named` (since TypeScript's own type checker handles named export validation) and enables TypeScript-aware resolution settings.
+
+    Install the required packages first:
+
+    ```bash
+    npm install --save-dev @typescript-eslint/parser eslint-import-resolver-typescript
+    ```
+
+    <Tabs>
+      <Tab title="Flat config">
+        ```js eslint.config.js
+        import tseslint from 'typescript-eslint';
+        import importPlugin from 'eslint-plugin-import';
+        import js from '@eslint/js';
+
+        export default tseslint.config(
+          js.configs.recommended,
+          {
+            files: ['**/*.{ts,tsx}'],
+            extends: [
+              importPlugin.flatConfigs.recommended,
+              importPlugin.flatConfigs.typescript,
+            ],
+          }
+        );
+        ```
+      </Tab>
+      <Tab title="Legacy config">
+        ```jsonc .eslintrc.json
+        {
+          "extends": [
+            "eslint:recommended",
+            "plugin:import/recommended",
+            "plugin:import/typescript"
+          ],
+          "settings": {
+            "import/resolver": {
+              "typescript": true,
+              "node": true
+            }
+          }
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="react">
+    Extends the recommended config with settings suitable for React projects, including `.jsx` in the list of parsed extensions.
+
+    <Tabs>
+      <Tab title="Flat config">
+        ```js eslint.config.js
+        import importPlugin from 'eslint-plugin-import';
+
+        export default [importPlugin.flatConfigs.react];
+        ```
+      </Tab>
+      <Tab title="Legacy config">
+        ```jsonc .eslintrc.json
+        {
+          "extends": ["plugin:import/react"]
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="react-native">
+    Adds React Native module resolution support on top of the recommended config.
+
+    <Tabs>
+      <Tab title="Flat config">
+        ```js eslint.config.js
+        import importPlugin from 'eslint-plugin-import';
+
+        export default [importPlugin.flatConfigs['react-native']];
+        ```
+      </Tab>
+      <Tab title="Legacy config">
+        ```jsonc .eslintrc.json
+        {
+          "extends": ["plugin:import/react-native"]
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="electron">
+    Adds `electron` to `import/core-modules` so that `import 'electron'` is not reported as unresolved.
+
+    <Tabs>
+      <Tab title="Flat config">
+        ```js eslint.config.js
+        import importPlugin from 'eslint-plugin-import';
+
+        export default [importPlugin.flatConfigs.electron];
+        ```
+      </Tab>
+      <Tab title="Legacy config">
+        ```jsonc .eslintrc.json
+        {
+          "extends": ["plugin:import/electron"]
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="stage-0">
+    Enables experimental rules that are still being evaluated. Rules in this config are subject to change without a major version bump.
+
+    <Warning>
+      The `stage-0` config is only available in the legacy format via `plugin:import/stage-0`. It is not exposed as a flat config.
+    </Warning>
+
+    ```jsonc .eslintrc.json
+    {
+      "extends": ["plugin:import/stage-0"]
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Combining configs
+
+You can layer multiple configs together. A common pattern is to extend `recommended` and then add environment-specific rules on top:
+
+<Tabs>
+  <Tab title="Flat config (eslint.config.js)">
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+    import js from '@eslint/js';
+
+    export default [
+      js.configs.recommended,
+      importPlugin.flatConfigs.recommended,
+      {
+        files: ['**/*.{js,mjs,cjs}'],
+        languageOptions: {
+          ecmaVersion: 'latest',
+          sourceType: 'module',
+        },
+        rules: {
+          'import/no-dynamic-require': 'warn',
+          'import/no-nodejs-modules': 'warn',
+          'import/order': ['error', { 'newlines-between': 'always' }],
+        },
+      },
+    ];
+    ```
+  </Tab>
+  <Tab title="Legacy config (.eslintrc)">
+    ```jsonc .eslintrc.json
+    {
+      "extends": [
+        "eslint:recommended",
+        "plugin:import/recommended"
+      ],
+      "rules": {
+        "import/no-dynamic-require": "warn",
+        "import/no-nodejs-modules": "warn",
+        "import/order": ["error", { "newlines-between": "always" }]
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## How flat configs work
+
+In the flat config system, `importPlugin.flatConfigs.<name>` is a plain JavaScript object with `name`, `plugins`, `rules`, and `languageOptions` properties. You spread or include it directly in your config array rather than referencing it by a string name.
+
+```js eslint.config.js
+// importPlugin.flatConfigs.recommended expands to something like:
+{
+  name: 'import/recommended',
+  plugins: { import: importPlugin },
+  rules: {
+    'import/no-unresolved': 'error',
+    'import/named': 'error',
+    'import/namespace': 'error',
+    'import/default': 'error',
+    'import/export': 'error',
+    'import/no-named-as-default': 'warn',
+    'import/no-named-as-default-member': 'warn',
+    'import/no-duplicates': 'warn',
+  },
+  languageOptions: {
+    ecmaVersion: 2018,
+    sourceType: 'module',
+  },
+}
+```
+
+Because the flat config system uses JavaScript objects rather than string references, you can inspect and override any property directly before including the config in your array.

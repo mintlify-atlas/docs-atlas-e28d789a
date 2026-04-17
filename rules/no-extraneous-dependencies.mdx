@@ -1,0 +1,116 @@
+---
+title: "import/no-extraneous-dependencies — catch missing deps"
+description: "Forbids importing packages absent from package.json's dependencies, devDependencies, optionalDependencies, peerDependencies, or bundledDependencies fields."
+---
+
+The `import/no-extraneous-dependencies` rule verifies that every external package you import is declared in your `package.json`. It walks up the directory tree to find the closest `package.json` and checks all five dependency fields. Importing a package that is only available because it happens to be installed as a transitive dependency is flagged — those installs are not guaranteed to exist across environments or package manager versions.
+
+Internal modules (relative paths and Node built-ins) are ignored by default. Type-only imports are also skipped unless you opt in. The rule requires packages to actually be installed on disk in order to resolve them.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-extraneous-dependencies": "error"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config. Add it explicitly and configure `devDependencies` to match your project layout.
+</Warning>
+
+## Options
+
+<ParamField body="devDependencies" type="boolean | string[]" default="true">
+  When `false`, imports of packages listed only in `devDependencies` are reported. Pass a glob array (e.g. `["**/*.test.js", "**/*.spec.js"]`) to allow dev imports only in files whose path matches one of the globs. Files that do not match the glob are treated as production code and dev imports are flagged.
+</ParamField>
+
+<ParamField body="optionalDependencies" type="boolean | string[]" default="true">
+  When `false`, imports of packages listed only in `optionalDependencies` are reported. Accepts the same glob-array shorthand as `devDependencies`.
+</ParamField>
+
+<ParamField body="peerDependencies" type="boolean | string[]" default="true">
+  When `false`, imports of packages listed only in `peerDependencies` are reported. Accepts the same glob-array shorthand as `devDependencies`.
+</ParamField>
+
+<ParamField body="bundledDependencies" type="boolean | string[]" default="true">
+  When `false`, imports of packages listed in `bundledDependencies` (or `bundleDependencies`) are reported. Accepts the same glob-array shorthand as `devDependencies`.
+</ParamField>
+
+<ParamField body="packageDir" type="string | string[]">
+  Path (or array of paths) to the directory containing your `package.json`. Relative paths are resolved from the current working directory at lint time. Use `__dirname` in a `.eslintrc.js` file for editor-integration stability. Pass an array to support monorepos where dependencies are spread across multiple manifests.
+</ParamField>
+
+<ParamField body="includeInternal" type="boolean" default="false">
+  When `true`, relative internal imports are also checked against `package.json`. Normally internal modules are exempt.
+</ParamField>
+
+<ParamField body="includeTypes" type="boolean" default="false">
+  When `true`, TypeScript type-only imports (`import type { … }`) are verified against `package.json` just like value imports. By default they are skipped.
+</ParamField>
+
+## Examples
+
+Given this `package.json`:
+
+```json package.json
+{
+  "dependencies": { "lodash.find": "^4.2.0" },
+  "devDependencies": { "ava": "^0.13.0" },
+  "optionalDependencies": { "lodash.isarray": "^4.0.0" },
+  "peerDependencies": { "react": ">=15.0.0 <16.0.0" },
+  "bundledDependencies": ["@generated/foo"]
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid — declared in dependencies or exempt
+import find from 'lodash.find'        // in dependencies ✓
+import path from 'path'               // Node built-in ✓
+import foo from './local-module'      // internal ✓
+import isArray from 'lodash.isarray'  // in optionalDependencies ✓ (default)
+```
+
+```js ❌ Invalid — not declared anywhere
+import _ from 'lodash'   // not in any dependency field
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```js ✅ Valid — dev import allowed in test files
+/* eslint import/no-extraneous-dependencies: ["error", {"devDependencies": ["**/*.test.js"]}] */
+// file: src/utils.test.js
+import test from 'ava'  // devDependency — allowed because filename matches glob
+```
+
+```js ❌ Invalid — dev import disallowed in production files
+/* eslint import/no-extraneous-dependencies: ["error", {"devDependencies": false}] */
+// file: src/utils.js
+import test from 'ava'  // 'ava' should be listed in dependencies, not devDependencies.
+```
+
+</CodeGroup>
+
+### Monorepo setup
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-extraneous-dependencies": [
+      "error",
+      { "packageDir": ["./packages/app", "./packages/shared"] }
+    ]
+  }
+}
+```
+
+## When to use / when to disable
+
+Enable this rule to prevent your application from silently depending on transitive installs that may disappear when a dependency updates its own `package.json`. It is especially valuable in monorepos where a package might be available in the root `node_modules` without being explicitly declared by the consuming package.
+
+Disable it if your project has no `package.json` (e.g. a standalone script), or if you manage dependencies through a non-standard mechanism that the rule cannot introspect.

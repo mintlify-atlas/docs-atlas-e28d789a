@@ -1,0 +1,87 @@
+---
+title: "import/namespace — validate namespace member access"
+description: "Ensures that properties accessed on a namespace import exist as named exports, including deeply nested re-exported namespaces and destructuring."
+---
+
+The `import/namespace` rule validates property accesses on namespace imports (`import * as ns from '…'`). When you read `ns.foo`, the rule checks that `foo` is actually exported by the source module. This validation is recursive — if the module re-exports another namespace (e.g. `export * as deep from './deep'`), then `ns.deep.bar` is traced through to `./deep` and checked there as well.
+
+The rule also reports assignments to namespace members (`ns.foo = 1`), computed property accesses (`ns[someVar]`) when `allowComputed` is `false`, and incorrect property names in destructuring patterns (`const { missing } = ns`).
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/namespace": "error"
+  }
+}
+```
+
+<Note>
+  This rule is included in the `errors` and `recommended` shared configs.
+</Note>
+
+## Options
+
+<ParamField body="allowComputed" type="boolean" default="false">
+  When `false` (the default), computed member access like `ns[variable]` is reported because it cannot be statically analysed. Set to `true` to suppress those reports and allow dynamic property lookups on namespace imports.
+</ParamField>
+
+## Examples
+
+Given the following modules:
+
+```js named-exports.js
+export const a = 1
+export const b = 2
+export * as deep from './deep'
+```
+
+```js deep.js
+export const e = 'MC2'
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+import * as names from './named-exports'
+
+const x = names.a + names.b   // both exported
+
+// Deep namespace traversal
+const y = names.deep.e         // 'e' exists in './deep'
+
+// With { allowComputed: true }
+function get(key) { return names[key] }
+```
+
+```js ❌ Invalid
+import * as names from './named-exports'
+
+const z = names.c              // 'c' not exported
+
+const { a, b, c } = names     // 'c' not found in namespace
+
+names.deep.f                   // 'f' not found in deeply imported namespace 'names.deep'
+
+names.a = 99                   // assignment to namespace member is not allowed
+
+// With allowComputed: false (default)
+function get(key) { return names[key] }  // computed reference cannot be validated
+```
+
+</CodeGroup>
+
+### Allowing computed access
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/namespace": ["error", { "allowComputed": true }]
+  }
+}
+```
+
+## When to use / when to disable
+
+This rule is most valuable in codebases that use namespace imports extensively. It catches property typos that would otherwise only surface at runtime. If you do not use `import * as …` in your codebase, the rule has no effect. Consider pairing it with the ESLint `no-shadow` rule to prevent namespace variables being shadowed in nested scopes, which this rule does not currently track.

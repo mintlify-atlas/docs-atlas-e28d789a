@@ -1,0 +1,97 @@
+---
+title: "import/no-cycle — forbid circular dependency chains"
+description: "Detects when a module's dependency graph circles back to itself, helping prevent the subtle bugs and initialisation failures that cyclic imports cause."
+---
+
+The `import/no-cycle` rule traverses each module's dependency graph and reports if a path exists that eventually imports the file being linted — creating a cycle. Detection depth is unlimited by default (up to `Infinity`) but can be capped with `maxDepth` to reduce lint time on large projects.
+
+Type-only imports (`import type …` in TypeScript and Flow) are always ignored because they carry no runtime dependency. This rule does not detect the trivial case of a file importing itself — use the `import/no-self-import` rule for that.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-cycle": "error"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in the `recommended` or `errors` shared configs. Add it explicitly when you want cycle detection.
+</Warning>
+
+## Options
+
+<ParamField body="maxDepth" type="number | '∞'" default="Infinity">
+  Limits how many hops deep the dependency graph is traversed. Setting `maxDepth: 1` only checks for direct mutual imports. Use `'∞'` (string) to explicitly spell out unlimited depth.
+</ParamField>
+
+<ParamField body="ignoreExternal" type="boolean" default="false">
+  When `true`, the traversal stops at `node_modules` boundaries. Cycles that pass through external packages are not reported. Useful for reducing lint time.
+</ParamField>
+
+<ParamField body="allowUnsafeDynamicCyclicDependency" type="boolean" default="false">
+  Suppresses reports for cycles that involve at least one dynamic `import()` expression. Dynamic imports can sometimes be used intentionally to break initialisation-order issues, but cyclic dependencies are still a code smell — use this option with care.
+</ParamField>
+
+<ParamField body="commonjs" type="boolean" default="false">
+  Inherited from the shared `moduleVisitor` options. Enables checking `require()` calls in addition to `import` statements for cycle detection purposes.
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+
+```js ✅ Valid — no cycle
+// a.js
+import { b } from './b'
+
+// b.js
+export const b = 'hello'
+```
+
+```js ❌ Invalid — cycle detected
+// dep-a.js
+import { b } from './dep-b'   // reported: Dependency cycle detected.
+
+// dep-b.js
+import './dep-a'
+export function b() {}
+```
+
+</CodeGroup>
+
+### Limiting depth
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-cycle": ["error", { "maxDepth": 1 }]
+  }
+}
+```
+
+```js
+// With maxDepth: 1, a → b → c → a is NOT reported (cycle is at depth 2 from a)
+// Only direct a ↔ b mutual imports are caught
+```
+
+### Ignoring external modules
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-cycle": ["error", { "ignoreExternal": true }]
+  }
+}
+```
+
+```js
+// dep-a.js — a cycle that passes through node_modules is not reported
+import 'some-package/dep-b'
+```
+
+## When to use / when to disable
+
+Cyclic imports are a well-known source of subtle initialisation bugs — a module may receive `undefined` for an import that hasn't been evaluated yet. Enable this rule to surface those issues early. Be aware that it is **computationally expensive** on large dependency graphs. If lint times are a concern, start with `maxDepth: 2` or `ignoreExternal: true` as a compromise.

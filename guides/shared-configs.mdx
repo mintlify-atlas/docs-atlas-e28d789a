@@ -1,0 +1,300 @@
+---
+title: "Shared configs: recommended, typescript, react, and more"
+description: "eslint-plugin-import ships with eight shared configs for different environments. Learn which rules each enables and how to extend them in your project."
+---
+
+`eslint-plugin-import` bundles eight shared configs so you can adopt a reasonable rule set without configuring every rule by hand. Each config targets a specific environment or use-case—some enable hard errors, some add warnings, and some only adjust settings without touching rules at all. You can extend one config, stack several together, or use them as a reference when assembling a custom rule set.
+
+## Overview
+
+<CardGroup cols={2}>
+  <Card title="recommended" icon="circle-check">
+    Errors for unresolved imports, named exports, namespaces, defaults, and duplicate exports. Warnings for common anti-patterns. The right starting point for most projects.
+  </Card>
+  <Card title="errors" icon="circle-xmark">
+    Only the rules that are runtime errors waiting to happen—all set to `error`. No warnings, no style rules.
+  </Card>
+  <Card title="warnings" icon="triangle-exclamation">
+    A handful of opinionated rules set to `warn`. Useful when you want to highlight potential issues without blocking CI.
+  </Card>
+  <Card title="typescript" icon="file-code">
+    Adds TypeScript extensions to `import/extensions` and `import/parsers`, includes `node_modules/@types` as external, and disables `import/named` (TypeScript already verifies it).
+  </Card>
+  <Card title="react" icon="react">
+    Adds `.jsx` to `import/extensions` and enables JSX parsing in `parserOptions`.
+  </Card>
+  <Card title="react-native" icon="mobile">
+    Configures the Node resolver with platform-specific extensions: `.js`, `.web.js`, `.ios.js`, `.android.js`.
+  </Card>
+  <Card title="electron" icon="desktop">
+    Adds `electron` to `import/core-modules` so the Electron built-in is not flagged as unresolved.
+  </Card>
+  <Card title="stage-0" icon="flask">
+    Enables `import/no-deprecated` as a warning. Rules here may change without a semver bump—use with care.
+  </Card>
+</CardGroup>
+
+---
+
+## Config details
+
+### `recommended`
+
+The baseline config for most projects. It registers the plugin and sets five rules as errors (static analysis) and three as warnings (common red flags).
+
+```js config/recommended.js
+module.exports = {
+  plugins: ['import'],
+  rules: {
+    // analysis/correctness — hard errors
+    'import/no-unresolved': 'error',
+    'import/named': 'error',
+    'import/namespace': 'error',
+    'import/default': 'error',
+    'import/export': 'error',
+
+    // red flags — warnings
+    'import/no-named-as-default': 'warn',
+    'import/no-named-as-default-member': 'warn',
+    'import/no-duplicates': 'warn',
+  },
+  parserOptions: {
+    sourceType: 'module',
+    ecmaVersion: 2018,
+  },
+};
+```
+
+### `errors`
+
+An unopinionated config containing only the rules that represent definite runtime failures—nothing stylistic or advisory. All five rules are set to severity `2` (`error`).
+
+```js config/errors.js
+module.exports = {
+  plugins: ['import'],
+  rules: {
+    'import/no-unresolved': 2,
+    'import/named': 2,
+    'import/namespace': 2,
+    'import/default': 2,
+    'import/export': 2,
+  },
+};
+```
+
+### `warnings`
+
+A more opinionated config containing only the three advisory rules, all set to severity `1` (`warn`). It pairs well with `errors` when you want a clear separation between blocking failures and non-blocking suggestions.
+
+```js config/warnings.js
+module.exports = {
+  plugins: ['import'],
+  rules: {
+    'import/no-named-as-default': 1,
+    'import/no-named-as-default-member': 1,
+    'import/no-duplicates': 1,
+  },
+};
+```
+
+### `typescript`
+
+Extends settings (not rules) to support TypeScript files. It also turns off `import/named` because TypeScript's compiler already validates named exports.
+
+```js config/typescript.js
+const typeScriptExtensions = ['.ts', '.cts', '.mts', '.tsx'];
+const allExtensions = [...typeScriptExtensions, '.js', '.jsx', '.mjs', '.cjs'];
+
+module.exports = {
+  settings: {
+    'import/extensions': allExtensions,
+    'import/external-module-folders': ['node_modules', 'node_modules/@types'],
+    'import/parsers': {
+      '@typescript-eslint/parser': typeScriptExtensions,
+    },
+    'import/resolver': {
+      node: { extensions: allExtensions },
+    },
+  },
+  rules: {
+    'import/named': 'off',
+  },
+};
+```
+
+See the [TypeScript guide](/guides/typescript) for full setup instructions.
+
+### `react`
+
+Adds `.jsx` to `import/extensions` and enables `ecmaFeatures.jsx` so the plugin can parse JSX syntax inside dependency files.
+
+```js config/react.js
+module.exports = {
+  settings: {
+    'import/extensions': ['.js', '.jsx'],
+  },
+  parserOptions: {
+    ecmaFeatures: { jsx: true },
+  },
+};
+```
+
+### `react-native`
+
+Configures the Node resolver to try platform-specific file extensions that React Native's bundler (Metro) understands.
+
+```js config/react-native.js
+module.exports = {
+  settings: {
+    'import/resolver': {
+      node: {
+        extensions: ['.js', '.web.js', '.ios.js', '.android.js'],
+      },
+    },
+  },
+};
+```
+
+<Note>
+The resolver will not complain if only one of these extensions exists for a given module. It tries each in order until it finds a match.
+</Note>
+
+### `electron`
+
+Adds `electron` to `import/core-modules` so `import 'electron'` is treated as a resolved built-in, not an unresolved package.
+
+```js config/electron.js
+module.exports = {
+  settings: {
+    'import/core-modules': ['electron'],
+  },
+};
+```
+
+### `stage-0`
+
+Enables `import/no-deprecated` as a warning. Rules in this config do not follow semver—they may be changed or removed without a major version bump.
+
+```js config/stage-0.js
+module.exports = {
+  plugins: ['import'],
+  rules: {
+    'import/no-deprecated': 1,
+  },
+};
+```
+
+<Warning>
+Do not use `stage-0` in a zero-tolerance lint pipeline. Rules here are experimental and may produce false positives.
+</Warning>
+
+---
+
+## Extending configs
+
+<Tabs>
+  <Tab title="Legacy (.eslintrc)">
+    Extend one or more configs using the `extends` array. Later entries win on rule conflicts.
+
+    ```jsonc .eslintrc
+    {
+      "extends": [
+        "eslint:recommended",
+        "plugin:import/recommended"
+      ]
+    }
+    ```
+
+    Combining `errors` and `warnings` produces the same rule set as `recommended`, but makes the intent explicit:
+
+    ```jsonc .eslintrc
+    {
+      "extends": [
+        "plugin:import/errors",
+        "plugin:import/warnings"
+      ]
+    }
+    ```
+
+    TypeScript project with React:
+
+    ```jsonc .eslintrc
+    {
+      "extends": [
+        "eslint:recommended",
+        "plugin:import/recommended",
+        "plugin:import/typescript",
+        "plugin:import/react"
+      ],
+      "settings": {
+        "import/resolver": {
+          "typescript": true,
+          "node": true
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Flat config (eslint.config.js)">
+    Spread flat config objects directly into the top-level array. The plugin exposes flat equivalents under `importPlugin.flatConfigs.*`.
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+    import js from '@eslint/js';
+
+    export default [
+      js.configs.recommended,
+      importPlugin.flatConfigs.recommended,
+      {
+        files: ['**/*.{js,mjs,cjs}'],
+        languageOptions: {
+          ecmaVersion: 'latest',
+          sourceType: 'module',
+        },
+      },
+    ];
+    ```
+
+    Scoping TypeScript config to `.ts` files only:
+
+    ```js eslint.config.js
+    import importPlugin from 'eslint-plugin-import';
+    import js from '@eslint/js';
+
+    export default [
+      js.configs.recommended,
+      importPlugin.flatConfigs.recommended,
+      {
+        files: ['**/*.{ts,tsx}'],
+        ...importPlugin.flatConfigs.typescript,
+        settings: {
+          'import/resolver': {
+            typescript: true,
+            node: true,
+          },
+        },
+      },
+    ];
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Comparing configs
+
+| Rule | `errors` | `warnings` | `recommended` |
+|---|---|---|---|
+| `import/no-unresolved` | error | — | error |
+| `import/named` | error | — | error |
+| `import/namespace` | error | — | error |
+| `import/default` | error | — | error |
+| `import/export` | error | — | error |
+| `import/no-named-as-default` | — | warn | warn |
+| `import/no-named-as-default-member` | — | warn | warn |
+| `import/no-duplicates` | — | warn | warn |
+
+<Tip>
+`recommended` is equivalent to extending both `errors` and `warnings` in a single config. Use `errors` + `warnings` separately only if you need to override the severity of one group independently.
+</Tip>

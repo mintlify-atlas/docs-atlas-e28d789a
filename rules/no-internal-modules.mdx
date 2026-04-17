@@ -1,0 +1,96 @@
+---
+title: "import/no-internal-modules — block deep submodule imports"
+description: "Prevents importing the internal submodules of other packages or directories, ensuring consumers rely only on a module's public entry point."
+---
+
+The `import/no-internal-modules` rule forbids imports that reach into the internals of another module — for example, `import helper from 'some-package/lib/internal/helper'` instead of the package's public `index.js`. This preserves encapsulation and prevents consumers from depending on private implementation details that may change without notice.
+
+The rule operates in one of two mutually exclusive modes: **allow-list** (`allow`) or **deny-list** (`forbid`). Use `allow` to specify the only deep paths that are permitted; everything else is blocked. Use `forbid` to explicitly name the deep paths that are prohibited while leaving everything else unrestricted.
+
+## Configuration
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-internal-modules": "error"
+  }
+}
+```
+
+<Warning>
+  This rule is **not** included in any shared config. Add it manually when you want to enforce submodule access policies.
+</Warning>
+
+## Options
+
+<Note>
+  The `allow` and `forbid` options are mutually exclusive. Providing both at the same time is not supported.
+</Note>
+
+<ParamField body="allow" type="string[]">
+  An array of [minimatch/glob](https://github.com/isaacs/node-glob#glob-primer) patterns. Only deep imports matching one of these patterns are permitted; all other deep imports are reported. Use this when you want an allow-list approach — most paths are blocked by default.
+</ParamField>
+
+<ParamField body="forbid" type="string[]">
+  An array of minimatch/glob patterns. Deep imports matching one of these patterns are reported; all other deep imports are allowed. Use this for a targeted deny-list approach.
+</ParamField>
+
+## Examples
+
+### Allow-list mode
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-internal-modules": ["error", {
+      "allow": ["**/actions/*", "source-map-support/*"]
+    }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+import 'source-map-support/register'       // matches allow pattern
+import getUser from '../actions/getUser'   // matches allow pattern
+import { settings } from '../app'          // top-level import — always fine
+```
+
+```js ❌ Invalid
+import { settings } from './app/index'          // reaching into app internals
+import userReducer from './reducer/user'         // reaching into reducer internals
+import configureStore from './redux/configureStore' // reaching into redux internals
+```
+
+</CodeGroup>
+
+### Deny-list mode
+
+```jsonc .eslintrc
+{
+  "rules": {
+    "import/no-internal-modules": ["error", {
+      "forbid": ["**/actions/*", "source-map-support/*"]
+    }]
+  }
+}
+```
+
+<CodeGroup>
+
+```js ✅ Valid
+import 'source-map-support'            // top-level package, not a submodule
+import { getUser } from '../actions'   // top-level directory import
+```
+
+```js ❌ Invalid
+import 'source-map-support/register'        // matches forbid pattern
+import getUser from '../actions/getUser'    // matches forbid pattern
+```
+
+</CodeGroup>
+
+## When to use / when to disable
+
+This rule is most useful for library authors who want to prevent consumers from importing private internals, and for monorepo teams enforcing package public APIs. Use allow-list mode when most submodule access should be blocked with a few known-safe exceptions. Use deny-list mode when submodule access is generally fine but specific paths should be off-limits. Disable the rule for packages (e.g. `lodash`, `date-fns`) that explicitly intend their submodules to be used directly as separate entry points.

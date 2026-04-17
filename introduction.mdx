@@ -1,0 +1,51 @@
+---
+title: "eslint-plugin-import: ES2015+ import linting for ESLint"
+description: "eslint-plugin-import validates ES2015+ import/export syntax with 46 rules covering path resolution, named exports, ordering, and module system consistency."
+---
+
+`eslint-plugin-import` supports linting of ES2015+ (ES6+) import/export syntax and prevents issues with misspelling of file paths and import names. Rather than discovering broken imports at runtime, the plugin surfaces these errors directly in your editor and CI pipeline by leveraging the static nature of ES module syntax. It works with ESLint v2 through v9 and supports both the legacy `.eslintrc` format and the modern flat `eslint.config.js` format introduced in ESLint v8.21.
+
+## What the plugin does
+
+ESLint on its own does not understand module resolution. `eslint-plugin-import` adds that understanding by walking the module graph at lint time. It resolves each `import` or `require` statement against the filesystem (or a configured resolver), then checks whether the referenced module exists, whether the named exports you're importing actually exist in the target file, and whether you're using them correctly.
+
+This catches a wide class of bugs that would otherwise only surface when the code runs:
+
+- Importing a file that doesn't exist
+- Importing a named export that was renamed or removed
+- Using a default import from a module that only has named exports
+- Re-exporting the same name twice
+- Circular dependency chains
+
+## Rule categories
+
+The plugin organises its 46 rules into four categories.
+
+**Static analysis** rules validate that imports can be resolved and that the imported bindings actually exist in the target module. These are the most impactful rules and include `import/no-unresolved`, `import/named`, `import/default`, and `import/namespace`.
+
+**Helpful warnings** rules flag patterns that are technically valid but commonly lead to confusion, such as using an exported name as the identifier for a default import (`import/no-named-as-default`) or importing the same module in multiple statements (`import/no-duplicates`).
+
+**Module systems** rules enforce consistency around which module format your project uses. You can forbid CommonJS `require` calls, AMD `define` and `require`, or Node.js built-in module imports.
+
+**Style guide** rules cover ordering, grouping, and formatting conventions for import statements, including `import/order`, `import/first`, and `import/newline-after-import`.
+
+## Supported environments
+
+| Dimension | Support |
+|-----------|---------|
+| ESLint versions | v2, v3, v4, v5, v6, v7, v8, v9 |
+| Config formats | Legacy `.eslintrc` and flat `eslint.config.js` |
+| Node.js | v4 and above |
+| TypeScript | via `plugin:import/typescript` / `importPlugin.flatConfigs.typescript` |
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install the plugin and apply the recommended ruleset in under five minutes.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/configuration">
+    Enable individual rules, extend shared configs, and configure resolvers.
+  </Card>
+  <Card title="Rules" icon="list-checks" href="/rules/no-unresolved">
+    Browse all 46 rules across the four categories with examples.
+  </Card>
+</CardGroup>

@@ -1,0 +1,129 @@
+---
+title: "import/no-duplicates — merge repeated module imports"
+description: "Report and auto-fix cases where the same module is imported more than once, resolving aliased paths and distinguishing TypeScript type-only imports."
+---
+
+The `import/no-duplicates` rule flags every situation where a single resolved module is imported two or more times in the same file. Unlike ESLint's built-in `no-duplicate-imports` rule, this version resolves paths before comparing them, so `./foo` and `./foo.js` are detected as duplicates even though the source strings differ. It also treats Flow and TypeScript `import type` declarations as separate from value imports, so a type-only import alongside a value import from the same module is considered valid. The rule is **auto-fixable**: running `eslint --fix` merges duplicate import statements into a single declaration.
+
+```jsonc
+// .eslintrc
+{
+  "rules": {
+    "import/no-duplicates": "error"
+  }
+}
+```
+
+<Warning>
+  `import/no-duplicates` reports as a **warning** in the `recommended` and
+  `warnings` shared configs. Upgrade to `"error"` if you want CI to fail on
+  duplicate imports.
+</Warning>
+
+---
+
+## Options
+
+Options are passed as properties of a single configuration object.
+
+### `considerQueryString`
+
+<ParamField body="considerQueryString" type="boolean" default="false">
+  By default the rule ignores query strings, treating `./mod?a` and `./mod?b`
+  as duplicates of `./mod`. Set to `true` to treat imports with different query
+  strings as distinct modules (useful for bundler-level features such as
+  `./image.png?inline`).
+
+  ```jsonc
+  "import/no-duplicates": ["error", { "considerQueryString": true }]
+  ```
+</ParamField>
+
+---
+
+### `prefer-inline`
+
+<ParamField body="prefer-inline" type="boolean" default="false">
+  When `true`, the auto-fixer will merge a separate `import type { T }` into
+  the corresponding value import as an inline type specifier
+  (`import { value, type T } from '…'`) rather than keeping them as two
+  statements. Requires TypeScript 4.5+ for inline type import syntax.
+
+  ```jsonc
+  "import/no-duplicates": ["error", { "prefer-inline": true }]
+  ```
+</ParamField>
+
+---
+
+## Examples
+
+<CodeGroup>
+
+```js Valid
+// Default + namespace from same module — one import statement
+import SomeDefaultClass, * as names from './mod'
+
+// Type import from the same module is allowed alongside a value import
+import type SomeType from './mod'
+```
+
+```js Invalid
+// Two value imports from the same resolved module
+import SomeDefaultClass from './mod'
+
+import foo from './some-other-mod'
+
+import * as names from './mod'
+
+// './mod.js' resolves to the same file as './mod' — also a duplicate
+import { something } from './mod.js'
+```
+
+</CodeGroup>
+
+### With `prefer-inline: true`
+
+<CodeGroup>
+
+```js Valid (prefer-inline: true)
+import { AValue, type AType, type BType } from './mama-mia'
+
+import { CValue, type CType } from './papa-mia'
+```
+
+```js Invalid (prefer-inline: true)
+import { AValue, type AType } from './mama-mia'
+import type { BType } from './mama-mia'   // ← merge into above
+
+import { CValue } from './papa-mia'
+import type { CType } from './papa-mia'   // ← merge into above
+```
+
+</CodeGroup>
+
+### With `considerQueryString: true`
+
+<CodeGroup>
+
+```js Valid (considerQueryString: true)
+import minifiedMod from './mod?minify'
+import noCommentsMod from './mod?comments=0'
+import originalMod from './mod'
+```
+
+```js Invalid (considerQueryString: true)
+// Same query string → still a duplicate
+import SomeDefaultClass from './mod?minify'
+import * as names from './mod.js?minify'
+```
+
+</CodeGroup>
+
+---
+
+## When to use / when to disable
+
+**Use this rule** in every project. Duplicate imports are almost always the result of two developers independently adding imports from the same module and failing to merge them during a code review.
+
+**Disable this rule** if you intentionally split imports across lines for readability and rely on a bundler to tree-shake the result, or if you need a default and a namespace import from the same module on separate lines. Note that the ESLint core rule `no-duplicate-imports` may be a sufficient replacement if you are not using Flow type imports and your import paths always match exactly.
